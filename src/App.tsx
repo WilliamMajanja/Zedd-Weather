@@ -37,7 +37,9 @@ import {
   Tooltip, 
   ResponsiveContainer,
   AreaChart,
-  Area
+  Area,
+  ComposedChart,
+  Bar
 } from 'recharts';
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 import ReactMarkdown from 'react-markdown';
@@ -68,8 +70,8 @@ const getMetricStatus = (type: string, value: number) => {
       if (value > 5) return { label: 'High', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' };
       return { label: 'Low', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30' };
     case 'precip':
-      if (value > 10) return { label: 'Heavy', color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/30' };
-      if (value > 0) return { label: 'Light', color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/30' };
+      if (value > 50) return { label: 'High Prob', color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/30' };
+      if (value > 20) return { label: 'Possible', color: 'text-blue-400', bg: 'bg-blue-400/10', border: 'border-blue-400/30' };
       return { label: 'Clear', color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-800' };
     case 'pressure':
       if (value < 990) return { label: 'Low (Storm)', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30' };
@@ -115,8 +117,11 @@ const MetricCard = ({ title, value, unit, icon: Icon, type }: any) => {
 export default function App() {
   const [activeTab, setActiveTab] = useState<'telemetry' | 'risk' | 'map' | 'forecast' | 'locker'>('telemetry');
   
+  // Telemetry Source State
+  const [telemetrySource, setTelemetrySource] = useState<'onboard' | 'external'>('onboard');
+
   // Live Telemetry State
-  const [currentTelemetry, setCurrentTelemetry] = useState({
+  const [externalTelemetry, setExternalTelemetry] = useState({
     temp: 0,
     humidity: 0,
     pressure: 0,
@@ -125,6 +130,18 @@ export default function App() {
     uvIndex: 0,
     aqi: 0
   });
+
+  const [onboardTelemetry, setOnboardTelemetry] = useState({
+    temp: 22.5,
+    humidity: 45.2,
+    pressure: 1012.5,
+    precipitation: 15,
+    tide: 1.2,
+    uvIndex: 3.5,
+    aqi: 42
+  });
+
+  const currentTelemetry = telemetrySource === 'onboard' ? onboardTelemetry : externalTelemetry;
 
   // Risk Analysis State
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -206,18 +223,36 @@ export default function App() {
     if (!piLocation) return;
     setIsFetchingForecast(true);
     try {
-      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${piLocation.lat}&longitude=${piLocation.lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,uv_index_max&timezone=auto`);
-      const data = await res.json();
-      if (data && data.daily) {
-        const formatted = data.daily.time.map((timeStr: string, i: number) => ({
-          date: new Date(timeStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
-          tempMax: data.daily.temperature_2m_max[i],
-          tempMin: data.daily.temperature_2m_min[i],
-          precip: data.daily.precipitation_sum[i],
-          wind: data.daily.wind_speed_10m_max[i],
-          uv: data.daily.uv_index_max[i]
-        }));
-        setForecastData(formatted);
+      if (telemetrySource === 'external') {
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${piLocation.lat}&longitude=${piLocation.lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,uv_index_max&timezone=auto`);
+        const data = await res.json();
+        if (data && data.daily) {
+          const formatted = data.daily.time.map((timeStr: string, i: number) => ({
+            date: new Date(timeStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+            tempMax: data.daily.temperature_2m_max[i],
+            tempMin: data.daily.temperature_2m_min[i],
+            precip: data.daily.precipitation_probability_max[i],
+            wind: data.daily.wind_speed_10m_max[i],
+            uv: data.daily.uv_index_max[i]
+          }));
+          setForecastData(formatted);
+        }
+      } else {
+        // Generate mock forecast for onboard
+        const mockForecast = [];
+        const now = new Date();
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(now.getTime() + i * 24 * 60 * 60 * 1000);
+          mockForecast.push({
+            date: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+            tempMax: 20 + Math.random() * 10,
+            tempMin: 10 + Math.random() * 10,
+            precip: Math.floor(Math.random() * 100),
+            wind: 5 + Math.random() * 20,
+            uv: Math.random() * 10
+          });
+        }
+        setForecastData(mockForecast);
       }
     } catch (err) {
       console.error(err);
@@ -227,10 +262,10 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (activeTab === 'forecast' && forecastData.length === 0) {
+    if (activeTab === 'forecast') {
       fetchForecast();
     }
-  }, [activeTab, piLocation]);
+  }, [activeTab, piLocation, telemetrySource]);
 
   const analyzeForecast = async () => {
     setIsAnalyzing(true);
@@ -285,7 +320,7 @@ export default function App() {
       const { lat, lng: lon } = location;
       
       const [weatherRes, aqiRes, marineRes] = await Promise.all([
-        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,precipitation,uv_index`),
+        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,uv_index&hourly=precipitation_probability&timezone=auto`),
         fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi`),
         fetch(`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height`)
       ]);
@@ -294,17 +329,21 @@ export default function App() {
       const aqi = await aqiRes.json();
       const marine = await marineRes.json();
 
+      // Get current hour index for hourly data
+      const currentHour = new Date().getHours();
+      const precipProb = weather.hourly?.precipitation_probability?.[currentHour] ?? 0;
+
       const newTelemetry = {
-        temp: weather.current.temperature_2m,
-        humidity: weather.current.relative_humidity_2m,
-        pressure: weather.current.surface_pressure,
-        precipitation: weather.current.precipitation,
-        uvIndex: weather.current.uv_index,
-        aqi: aqi.current.us_aqi || 42,
-        tide: marine.current?.wave_height || 1.2
+        temp: weather.current?.temperature_2m ?? 0,
+        humidity: weather.current?.relative_humidity_2m ?? 0,
+        pressure: weather.current?.surface_pressure ?? 0,
+        precipitation: precipProb,
+        uvIndex: weather.current?.uv_index ?? 0,
+        aqi: aqi.current?.us_aqi ?? 42,
+        tide: marine.current?.wave_height ?? 1.2
       };
 
-      setCurrentTelemetry(newTelemetry);
+      setExternalTelemetry(newTelemetry);
       return newTelemetry;
     } catch (error) {
       console.error("Failed to fetch real telemetry:", error);
@@ -324,7 +363,7 @@ export default function App() {
         - Temperature: ${telemetry.temp.toFixed(1)}°C
         - Humidity: ${telemetry.humidity.toFixed(1)}%
         - Pressure: ${telemetry.pressure.toFixed(1)} hPa
-        - Precipitation: ${telemetry.precipitation.toFixed(2)} mm
+        - Precipitation: ${telemetry.precipitation.toFixed(0)} %
         - Tide/Wave Level: ${telemetry.tide.toFixed(2)} m
         - UV Index: ${telemetry.uvIndex.toFixed(1)}
         - AQI: ${Math.round(telemetry.aqi)}
@@ -373,6 +412,7 @@ export default function App() {
   useEffect(() => {
     let isMounted = true;
     let interval: any;
+    let simInterval: any;
     
     const init = async () => {
       let location = { lat: 37.7749, lng: -122.4194 }; // Default
@@ -398,6 +438,18 @@ export default function App() {
         interval = setInterval(() => {
           fetchRealTelemetry(location);
         }, 60000); // Update every minute
+
+        simInterval = setInterval(() => {
+          setOnboardTelemetry(prev => ({
+            ...prev,
+            temp: prev.temp + (Math.random() * 0.4 - 0.2),
+            humidity: Math.max(0, Math.min(100, prev.humidity + (Math.random() * 1 - 0.5))),
+            pressure: prev.pressure + (Math.random() * 0.2 - 0.1),
+            aqi: Math.max(0, prev.aqi + (Math.random() * 2 - 1)),
+            precipitation: Math.max(0, Math.min(100, prev.precipitation + (Math.random() * 10 - 5))),
+            uvIndex: Math.max(0, prev.uvIndex + (Math.random() * 0.2 - 0.1))
+          }));
+        }, 2000); // Update simulated hardware every 2 seconds
       }
     };
     
@@ -406,6 +458,7 @@ export default function App() {
     return () => {
       isMounted = false;
       if (interval) clearInterval(interval);
+      if (simInterval) clearInterval(simInterval);
     };
   }, []);
 
@@ -413,6 +466,45 @@ export default function App() {
   const [isFetchingMap, setIsFetchingMap] = useState(false);
   const [mapReport, setMapReport] = useState<string | null>(null);
   const [mapLinks, setMapLinks] = useState<any[]>([]);
+  const [isLocating, setIsLocating] = useState(false);
+
+  // Initial Geolocation
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setPiLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+        },
+        (error) => {
+          console.warn("Initial geolocation failed or denied.", error);
+        },
+        { timeout: 5000 }
+      );
+    }
+  }, []);
+
+  const locateMe = async () => {
+    setIsLocating(true);
+    setMapReport(null);
+    try {
+      if ('geolocation' in navigator) {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 });
+        });
+        const newLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
+        setPiLocation(newLocation);
+        // Automatically fetch map data for the new location
+        fetchSiteMapData(newLocation);
+      } else {
+        setMapReport("Geolocation is not supported by your browser.");
+      }
+    } catch (error) {
+      console.error("Failed to get location", error);
+      setMapReport("Failed to get your current location. Please ensure location permissions are granted.");
+    } finally {
+      setIsLocating(false);
+    }
+  };
 
   // Historical Data State
   const [historicalRange, setHistoricalRange] = useState<'7d' | '14d' | '30d'>('7d');
@@ -422,7 +514,8 @@ export default function App() {
   const [exportMetrics, setExportMetrics] = useState({
     temp: true,
     humidity: true,
-    pressure: true
+    pressure: true,
+    precipitation: true
   });
 
   const exportHistoricalToCSV = () => {
@@ -433,6 +526,7 @@ export default function App() {
     if (exportMetrics.temp) headers.push('Temperature (°C)');
     if (exportMetrics.humidity) headers.push('Humidity (%)');
     if (exportMetrics.pressure) headers.push('Pressure (hPa)');
+    if (exportMetrics.precipitation) headers.push('Precipitation Prob. (%)');
     
     // Create CSV rows
     const rows = historicalData.map(data => {
@@ -440,6 +534,7 @@ export default function App() {
       if (exportMetrics.temp) row.push(data.temp);
       if (exportMetrics.humidity) row.push(data.humidity);
       if (exportMetrics.pressure) row.push(data.pressure);
+      if (exportMetrics.precipitation) row.push(data.precipitation || 0);
       return row.join(',');
     });
 
@@ -457,31 +552,64 @@ export default function App() {
   };
 
   // Fetch Historical Telemetry
-  const fetchHistoricalTelemetry = async (days: number, location: {lat: number, lng: number}) => {
+  const fetchHistoricalTelemetry = async (days: number, location: {lat: number, lng: number}, source: 'onboard' | 'external') => {
     setIsFetchingHistory(true);
     try {
-      const { lat, lng: lon } = location;
-      
-      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&past_days=${days}&hourly=temperature_2m,relative_humidity_2m,surface_pressure`);
-      const data = await res.json();
-      
-      if (data && data.hourly) {
-        const formattedData = data.hourly.time.map((timeStr: string, index: number) => {
-          const date = new Date(timeStr);
-          return {
-            time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' }),
-            rawDate: date,
-            temp: data.hourly.temperature_2m[index],
-            humidity: data.hourly.relative_humidity_2m[index],
-            pressure: data.hourly.surface_pressure[index],
-          };
-        });
+      if (source === 'external') {
+        const { lat, lng: lon } = location;
         
-        // Filter to show roughly 1 point per day for longer ranges to avoid chart clutter, or every 6 hours for 7 days
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&past_days=${days}&hourly=temperature_2m,relative_humidity_2m,surface_pressure,precipitation_probability`);
+        const data = await res.json();
+        
+        if (data && data.hourly) {
+          const formattedData = data.hourly.time.map((timeStr: string, index: number) => {
+            const date = new Date(timeStr);
+            return {
+              time: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' }),
+              rawDate: date,
+              temp: data.hourly.temperature_2m[index],
+              humidity: data.hourly.relative_humidity_2m[index],
+              pressure: data.hourly.surface_pressure[index],
+              precipitation: data.hourly.precipitation_probability[index],
+            };
+          });
+          
+          // Filter to show roughly 1 point per day for longer ranges to avoid chart clutter, or every 6 hours for 7 days
+          const step = days === 7 ? 6 : (days === 14 ? 12 : 24);
+          const sampledData = formattedData.filter((_: any, i: number) => i % step === 0);
+          
+          setHistoricalData(sampledData);
+        }
+      } else {
+        // Generate mock historical data for onboard
+        const mockData = [];
+        const now = new Date();
         const step = days === 7 ? 6 : (days === 14 ? 12 : 24);
-        const sampledData = formattedData.filter((_: any, i: number) => i % step === 0);
+        const totalPoints = (days * 24) / step;
         
-        setHistoricalData(sampledData);
+        let lastTemp = 22;
+        let lastHum = 45;
+        let lastPres = 1012;
+        let lastPrecip = 10;
+
+        for (let i = totalPoints; i >= 0; i--) {
+          const d = new Date(now.getTime() - i * step * 60 * 60 * 1000);
+          
+          lastTemp += (Math.random() * 4 - 2);
+          lastHum = Math.max(20, Math.min(80, lastHum + (Math.random() * 10 - 5)));
+          lastPres += (Math.random() * 4 - 2);
+          lastPrecip = Math.max(0, Math.min(100, lastPrecip + (Math.random() * 20 - 10)));
+
+          mockData.push({
+            time: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' }),
+            rawDate: d,
+            temp: lastTemp,
+            humidity: lastHum,
+            pressure: lastPres,
+            precipitation: lastPrecip
+          });
+        }
+        setHistoricalData(mockData);
       }
     } catch (error) {
       console.error("Failed to fetch historical telemetry:", error);
@@ -493,9 +621,9 @@ export default function App() {
   useEffect(() => {
     if (activeTab === 'telemetry' && piLocation) {
       const days = historicalRange === '7d' ? 7 : (historicalRange === '14d' ? 14 : 30);
-      fetchHistoricalTelemetry(days, piLocation);
+      fetchHistoricalTelemetry(days, piLocation, telemetrySource);
     }
-  }, [historicalRange, activeTab, piLocation]);
+  }, [historicalRange, activeTab, piLocation, telemetrySource]);
 
   const [nodes] = useState([
     { id: 'Node Alpha', role: 'Primary - Sense HAT', status: 'Active', ip: '10.0.0.15', detail: 'Capturing telemetry' },
@@ -605,7 +733,7 @@ export default function App() {
             - Temperature: ${currentTelemetry.temp.toFixed(1)}°C
             - Humidity: ${currentTelemetry.humidity.toFixed(1)}%
             - Pressure: ${currentTelemetry.pressure.toFixed(1)} hPa
-            - Precipitation: ${currentTelemetry.precipitation.toFixed(2)} mm
+            - Precipitation: ${currentTelemetry.precipitation.toFixed(0)} %
             - Tide Level: ${currentTelemetry.tide.toFixed(2)} m
             - UV Index: ${currentTelemetry.uvIndex.toFixed(1)}
             - AQI: ${Math.round(currentTelemetry.aqi)}
@@ -678,18 +806,19 @@ export default function App() {
     }
   };
 
-  const fetchSiteMapData = async () => {
+  const fetchSiteMapData = async (overrideLocation?: {lat: number, lng: number}) => {
     setIsFetchingMap(true);
     setMapReport(null);
     setMapLinks([]);
 
     try {
-      const lat = piLocation?.lat || 37.7749;
-      const lng = piLocation?.lng || -122.4194;
+      const loc = overrideLocation || piLocation;
+      const lat = loc?.lat || 37.7749;
+      const lng = loc?.lng || -122.4194;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Find nearby emergency services and hardware stores near this location. Provide a brief logistics report.`,
+        contents: `Find nearby emergency services and hardware stores near the coordinates ${lat}, ${lng}. Provide a brief logistics report.`,
         config: {
           tools: [{ googleMaps: {} }],
           toolConfig: {
@@ -805,12 +934,38 @@ export default function App() {
 
         {activeTab === 'telemetry' && (
           <>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-slate-200">Current Readings</h2>
+              <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800">
+                <button
+                  onClick={() => setTelemetrySource('onboard')}
+                  className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    telemetrySource === 'onboard' 
+                      ? 'bg-emerald-600 text-white shadow-sm' 
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  On Board Telemetry
+                </button>
+                <button
+                  onClick={() => setTelemetrySource('external')}
+                  className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    telemetrySource === 'external' 
+                      ? 'bg-blue-600 text-white shadow-sm' 
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  AccuWeather API
+                </button>
+              </div>
+            </div>
+
             {/* Dashboard Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8">
               <MetricCard title="Temperature" value={currentTelemetry.temp.toFixed(1)} unit="°C" icon={Thermometer} type="temp" />
               <MetricCard title="Humidity" value={currentTelemetry.humidity.toFixed(1)} unit="%" icon={Droplets} type="humidity" />
               <MetricCard title="Pressure" value={currentTelemetry.pressure.toFixed(1)} unit="hPa" icon={Wind} type="pressure" />
-              <MetricCard title="Precipitation" value={currentTelemetry.precipitation.toFixed(2)} unit="mm" icon={CloudRain} type="precip" />
+              <MetricCard title="Precip Prob." value={currentTelemetry.precipitation.toFixed(0)} unit="%" icon={CloudRain} type="precip" />
               <MetricCard title="Tide Level" value={currentTelemetry.tide.toFixed(2)} unit="m" icon={Waves} type="tide" />
               <MetricCard title="UV Index" value={currentTelemetry.uvIndex.toFixed(1)} unit="" icon={Sun} type="uv" />
               <MetricCard title="AQI" value={Math.round(currentTelemetry.aqi)} unit="" icon={Activity} type="aqi" />
@@ -860,7 +1015,7 @@ export default function App() {
                   ) : (
                     <div className="h-64">
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={historicalData}>
+                        <ComposedChart data={historicalData}>
                           <defs>
                             <linearGradient id="colorTempHist" x1="0" y1="0" x2="0" y2="1">
                               <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
@@ -880,9 +1035,10 @@ export default function App() {
                             itemStyle={{ fontSize: '12px' }}
                             labelStyle={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}
                           />
+                          <Bar yAxisId="right" dataKey="precipitation" fill="#0ea5e9" opacity={0.5} name="Precip Prob. (%)" />
                           <Area yAxisId="left" type="monotone" dataKey="temp" stroke="#f43f5e" strokeWidth={2} fillOpacity={1} fill="url(#colorTempHist)" name="Temp (°C)" />
                           <Area yAxisId="right" type="monotone" dataKey="humidity" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorHumidHist)" name="Humidity (%)" />
-                        </AreaChart>
+                        </ComposedChart>
                       </ResponsiveContainer>
                     </div>
                   )}
@@ -1056,7 +1212,7 @@ export default function App() {
                   </div>
                   <div className="bg-[#1a1a1a] p-3 rounded-lg border border-slate-800">
                     <p className="text-xs text-slate-500">Precipitation</p>
-                    <p className="text-lg font-semibold text-slate-200">{currentTelemetry.precipitation.toFixed(2)} mm</p>
+                    <p className="text-lg font-semibold text-slate-200">{currentTelemetry.precipitation.toFixed(0)} %</p>
                   </div>
                   <div className="bg-[#1a1a1a] p-3 rounded-lg border border-slate-800">
                     <p className="text-xs text-slate-500">Tide Level</p>
@@ -1233,14 +1389,24 @@ export default function App() {
                   </p>
                 )}
               </div>
-              <button 
-                onClick={fetchSiteMapData}
-                disabled={isFetchingMap}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center w-full sm:w-auto"
-              >
-                {isFetchingMap ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <MapIcon className="w-4 h-4 mr-2" />}
-                {isFetchingMap ? 'Querying Maps...' : 'Fetch Local Logistics'}
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <button 
+                  onClick={locateMe}
+                  disabled={isLocating || isFetchingMap}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 disabled:text-slate-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center w-full sm:w-auto border border-slate-700"
+                >
+                  {isLocating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <MapIcon className="w-4 h-4 mr-2" />}
+                  {isLocating ? 'Locating...' : 'Use My Location'}
+                </button>
+                <button 
+                  onClick={() => fetchSiteMapData()}
+                  disabled={isFetchingMap}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center w-full sm:w-auto"
+                >
+                  {isFetchingMap ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <MapIcon className="w-4 h-4 mr-2" />}
+                  {isFetchingMap ? 'Querying Maps...' : 'Fetch Local Logistics'}
+                </button>
+              </div>
             </div>
 
             {isFetchingMap ? (
@@ -1271,24 +1437,35 @@ export default function App() {
                 <div className="bg-[#1a1a1a] p-6 rounded-xl border border-slate-800">
                   <h3 className="text-sm font-medium text-slate-400 mb-4 uppercase tracking-wider flex items-center">
                     <MapIcon className="w-4 h-4 mr-2" />
-                    Map Links
+                    Map Links & Sources
                   </h3>
                   <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
                     {mapLinks.length > 0 ? mapLinks.map((mapData, idx) => (
-                      <a 
-                        key={idx} 
-                        href={mapData.uri} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="block p-4 bg-slate-900 border border-slate-800 rounded-lg text-sm hover:border-blue-500/50 hover:bg-slate-800 transition-all group"
-                      >
-                        <p className="text-blue-400 font-medium mb-1 group-hover:text-blue-300 transition-colors line-clamp-2">
-                          {mapData.title || 'View on Google Maps'}
-                        </p>
-                        <p className="text-xs text-slate-500 truncate">
-                          {mapData.uri}
-                        </p>
-                      </a>
+                      <div key={idx} className="block p-4 bg-slate-900 border border-slate-800 rounded-lg text-sm transition-all group">
+                        <a 
+                          href={mapData.uri} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="hover:text-blue-300 transition-colors"
+                        >
+                          <p className="text-blue-400 font-medium mb-1 line-clamp-2">
+                            {mapData.title || 'View on Google Maps'}
+                          </p>
+                          <p className="text-xs text-slate-500 truncate mb-2">
+                            {mapData.uri}
+                          </p>
+                        </a>
+                        {mapData.placeAnswerSources?.reviewSnippets && mapData.placeAnswerSources.reviewSnippets.length > 0 && (
+                          <div className="mt-2 space-y-2 border-t border-slate-800 pt-2">
+                            {mapData.placeAnswerSources.reviewSnippets.map((snippet: any, sIdx: number) => (
+                              <div key={sIdx} className="text-xs text-slate-400 italic bg-slate-800/50 p-2 rounded">
+                                "{snippet.text}"
+                                {snippet.authorName && <span className="block mt-1 text-slate-500">- {snippet.authorName}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )) : (
                       <div className="p-4 bg-slate-900 border border-slate-800 rounded-lg text-center">
                         <p className="text-sm text-slate-500">No specific map links found.</p>
@@ -1351,8 +1528,8 @@ export default function App() {
                         <span className="text-sm text-slate-200">{day.tempMin.toFixed(1)}°C</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-xs text-slate-500 flex items-center"><CloudRain className="w-3 h-3 mr-1" /> Precip</span>
-                        <span className="text-sm text-slate-200">{day.precip.toFixed(1)} mm</span>
+                        <span className="text-xs text-slate-500 flex items-center"><CloudRain className="w-3 h-3 mr-1" /> Precip Prob.</span>
+                        <span className="text-sm text-slate-200">{day.precip.toFixed(0)} %</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-xs text-slate-500 flex items-center"><Wind className="w-3 h-3 mr-1" /> Wind</span>
@@ -1607,6 +1784,15 @@ export default function App() {
                     />
                     <span className="text-sm text-slate-400 flex items-center"><Wind className="w-4 h-4 mr-2 text-slate-400" /> Pressure</span>
                   </label>
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={exportMetrics.precipitation}
+                      onChange={(e) => setExportMetrics(prev => ({ ...prev, precipitation: e.target.checked }))}
+                      className="form-checkbox h-4 w-4 text-emerald-500 rounded border-slate-700 bg-slate-900 focus:ring-emerald-500 focus:ring-offset-slate-900"
+                    />
+                    <span className="text-sm text-slate-400 flex items-center"><CloudRain className="w-4 h-4 mr-2 text-blue-300" /> Precipitation</span>
+                  </label>
                 </div>
               </div>
               
@@ -1626,7 +1812,7 @@ export default function App() {
               </button>
               <button 
                 onClick={exportHistoricalToCSV}
-                disabled={!exportMetrics.temp && !exportMetrics.humidity && !exportMetrics.pressure}
+                disabled={!exportMetrics.temp && !exportMetrics.humidity && !exportMetrics.pressure && !exportMetrics.precipitation}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors flex items-center"
               >
                 <Download className="w-4 h-4 mr-2" />
