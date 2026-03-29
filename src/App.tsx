@@ -29,6 +29,15 @@ if (!apiKey) {
 const ai = new GoogleGenAI({ apiKey: apiKey ?? '' });
 
 const DEFAULT_LOCATION: GeoLocation = { lat: 37.7749, lng: -122.4194 };
+const DEFAULT_AQI = 42;
+const DEFAULT_TIDE = 1.2;
+const TELEMETRY_REFRESH_INTERVAL_MS = 60_000;
+
+const API_BASE = {
+  weather: 'https://api.open-meteo.com/v1/forecast',
+  airQuality: 'https://air-quality-api.open-meteo.com/v1/air-quality',
+  marine: 'https://marine-api.open-meteo.com/v1/marine',
+} as const;
 
 const TABS: { id: TabId; label: string; icon: typeof Activity }[] = [
   { id: 'telemetry', label: 'Telemetry', icon: Activity },
@@ -159,15 +168,31 @@ export default function App() {
   const fetchRealTelemetry = async (location: GeoLocation, signal?: AbortSignal): Promise<TelemetryData | null> => {
     try {
       const { lat, lng: lon } = location;
-      const [weatherRes, aqiRes, marineRes] = await Promise.all([
-        fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,precipitation,uv_index`, { signal }),
-        fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi`, { signal }),
-        fetch(`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&current=wave_height`, { signal })
+      const [weatherResult, aqiResult, marineResult] = await Promise.allSettled([
+        fetch(`${API_BASE.weather}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,precipitation,uv_index`, { signal }),
+        fetch(`${API_BASE.airQuality}?latitude=${lat}&longitude=${lon}&current=us_aqi`, { signal }),
+        fetch(`${API_BASE.marine}?latitude=${lat}&longitude=${lon}&current=wave_height`, { signal })
       ]);
 
-      const weather = await weatherRes.json();
-      const aqi = await aqiRes.json();
-      const marine = await marineRes.json();
+      // Weather is required, others are optional
+      if (weatherResult.status === 'rejected' || !weatherResult.value.ok) {
+        console.error("Weather API failed:", weatherResult.status === 'rejected' ? weatherResult.reason : weatherResult.value.statusText);
+        return null;
+      }
+
+      const weather = await weatherResult.value.json();
+
+      let aqiValue = DEFAULT_AQI;
+      if (aqiResult.status === 'fulfilled' && aqiResult.value.ok) {
+        const aqi = await aqiResult.value.json();
+        aqiValue = aqi.current?.us_aqi ?? DEFAULT_AQI;
+      }
+
+      let tideValue = DEFAULT_TIDE;
+      if (marineResult.status === 'fulfilled' && marineResult.value.ok) {
+        const marine = await marineResult.value.json();
+        tideValue = marine.current?.wave_height ?? DEFAULT_TIDE;
+      }
 
       const newTelemetry: TelemetryData = {
         temp: weather.current.temperature_2m,
@@ -175,8 +200,8 @@ export default function App() {
         pressure: weather.current.surface_pressure,
         precipitation: weather.current.precipitation,
         uvIndex: weather.current.uv_index,
-        aqi: aqi.current?.us_aqi ?? 42,
-        tide: marine.current?.wave_height ?? 1.2
+        aqi: aqiValue,
+        tide: tideValue
       };
 
       setCurrentTelemetry(newTelemetry);
@@ -314,7 +339,11 @@ export default function App() {
     if (!piLocation) return;
     setIsFetchingForecast(true);
     try {
-      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${piLocation.lat}&longitude=${piLocation.lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,uv_index_max&timezone=auto`);
+      const res = await fetch(`${API_BASE.weather}?latitude=${piLocation.lat}&longitude=${piLocation.lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,uv_index_max&timezone=auto`);
+      if (!res.ok) {
+        console.error("Forecast API returned:", res.status, res.statusText);
+        return;
+      }
       const data = await res.json();
       if (data?.daily) {
         const formatted: ForecastDay[] = data.daily.time.map((timeStr: string, i: number) => ({
@@ -504,7 +533,7 @@ export default function App() {
 
         interval = setInterval(() => {
           fetchRealTelemetry(location, controller.signal);
-        }, 60000);
+        }, TELEMETRY_REFRESH_INTERVAL_MS);
       }
     };
 

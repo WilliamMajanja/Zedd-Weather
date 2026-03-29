@@ -84,7 +84,7 @@ export function RiskAnalysisTab({
             </button>
           </div>
           <p className="text-sm text-slate-400 mb-4">
-            The system continuously monitors live telemetry and uses Gemini 3.1 Pro (High Thinking)
+            The system continuously monitors live telemetry and uses Gemini AI
             to generate mitigation directives without human interaction.
           </p>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">

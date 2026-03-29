@@ -84,6 +84,10 @@ export function TelemetryTab({
     try {
       const { lat, lng: lon } = location;
       const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&past_days=${days}&hourly=temperature_2m,relative_humidity_2m,surface_pressure`);
+      if (!res.ok) {
+        console.error("Historical telemetry API returned:", res.status, res.statusText);
+        return;
+      }
       const data = await res.json();
 
       if (data?.hourly) {
