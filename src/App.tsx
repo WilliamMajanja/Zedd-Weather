@@ -18,7 +18,15 @@ import {
   CloudRain,
   Waves,
   Sun,
-  X
+  X,
+  CalendarDays,
+  Archive,
+  Download,
+  Upload,
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -105,7 +113,7 @@ const MetricCard = ({ title, value, unit, icon: Icon, type }: any) => {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'telemetry' | 'risk' | 'map'>('telemetry');
+  const [activeTab, setActiveTab] = useState<'telemetry' | 'risk' | 'map' | 'forecast' | 'locker'>('telemetry');
   
   // Live Telemetry State
   const [currentTelemetry, setCurrentTelemetry] = useState({
@@ -126,12 +134,155 @@ export default function App() {
   const [riskLevel, setRiskLevel] = useState<'Green' | 'Amber' | 'Red' | 'Black' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch real telemetry data from Open-Meteo APIs
-  const fetchRealTelemetry = async () => {
+  // Pi Location State
+  const [piLocation, setPiLocation] = useState<{lat: number, lng: number} | null>(null);
+
+  // Locker State
+  const [lockerEntries, setLockerEntries] = useState<any[]>([]);
+  const [lockerSearch, setLockerSearch] = useState('');
+  const [lockerFilter, setLockerFilter] = useState('All');
+  const [expandedLockerId, setExpandedLockerId] = useState<string | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
+
+  // Forecast State
+  const [forecastData, setForecastData] = useState<any[]>([]);
+  const [isFetchingForecast, setIsFetchingForecast] = useState(false);
+
+  // Load Locker on Mount
+  useEffect(() => {
+    const saved = localStorage.getItem('zedd_sharding_locker');
+    if (saved) {
+      try { setLockerEntries(JSON.parse(saved)); } catch (e) {}
+    }
+  }, []);
+
+  const saveToLocker = (shards: any[], report: string, level: string | null) => {
+    const newEntry = {
+      id: 'LKR-' + Date.now(),
+      timestamp: Date.now(),
+      shards,
+      report,
+      riskLevel: level
+    };
+    const updated = [newEntry, ...lockerEntries];
+    setLockerEntries(updated);
+    localStorage.setItem('zedd_sharding_locker', JSON.stringify(updated));
+  };
+
+  const exportShards = () => {
+    if (directiveShards.length === 0) return;
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(directiveShards));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "zedd-shards-" + Date.now() + ".json");
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
+  const importShards = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const importedShards = JSON.parse(event.target?.result as string);
+        if (Array.isArray(importedShards) && importedShards.length > 0 && importedShards[0].content) {
+          setDirectiveShards(importedShards);
+          const reconstructedReport = importedShards.map(s => s.content).join('\n\n');
+          setRiskReport(reconstructedReport);
+          setRiskLevel('Amber'); // Default or could be saved in export
+          setActiveTab('risk');
+        }
+      } catch (err) {
+        console.error("Failed to parse shards", err);
+      }
+    };
+    reader.readAsText(file);
+    if (importFileRef.current) importFileRef.current.value = '';
+  };
+
+  const fetchForecast = async () => {
+    if (!piLocation) return;
+    setIsFetchingForecast(true);
     try {
-      // Construction site coordinates (e.g., San Francisco)
-      const lat = 37.7749;
-      const lon = -122.4194;
+      const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${piLocation.lat}&longitude=${piLocation.lng}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,uv_index_max&timezone=auto`);
+      const data = await res.json();
+      if (data && data.daily) {
+        const formatted = data.daily.time.map((timeStr: string, i: number) => ({
+          date: new Date(timeStr).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+          tempMax: data.daily.temperature_2m_max[i],
+          tempMin: data.daily.temperature_2m_min[i],
+          precip: data.daily.precipitation_sum[i],
+          wind: data.daily.wind_speed_10m_max[i],
+          uv: data.daily.uv_index_max[i]
+        }));
+        setForecastData(formatted);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsFetchingForecast(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'forecast' && forecastData.length === 0) {
+      fetchForecast();
+    }
+  }, [activeTab, piLocation]);
+
+  const analyzeForecast = async () => {
+    setIsAnalyzing(true);
+    setRiskReport(null);
+    setRiskLevel(null);
+    setDirectiveShards([]);
+    setActiveTab('risk');
+    
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `You are a Principal Edge AI and IoT Systems Architect.
+        Here is the 7-day weather forecast for the site:
+        ${JSON.stringify(forecastData, null, 2)}
+        
+        Analyze this forecast for any upcoming environmental or structural risks.
+        Provide strict mitigation directives that will be cryptographically signed to the ledger.`,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              riskLevel: {
+                type: Type.STRING,
+                description: "The overall risk level based on the forecast. Must be one of: Green, Amber, Red, Black.",
+                enum: ["Green", "Amber", "Red", "Black"]
+              },
+              report: {
+                type: Type.STRING,
+                description: "The detailed markdown report containing the analysis and mitigation directives."
+              }
+            },
+            required: ["riskLevel", "report"]
+          }
+        }
+      });
+      const data = JSON.parse(response.text);
+      setRiskLevel(data.riskLevel);
+      setRiskReport(data.report);
+    } catch (error: any) {
+      console.error("Auto analysis failed", error);
+      setRiskReport("Failed to perform automated risk analysis on forecast.");
+      setRiskLevel("Amber");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Fetch real telemetry data from Open-Meteo APIs
+  const fetchRealTelemetry = async (location: {lat: number, lng: number}) => {
+    try {
+      const { lat, lng: lon } = location;
       
       const [weatherRes, aqiRes, marineRes] = await Promise.all([
         fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,surface_pressure,precipitation,uv_index`),
@@ -164,6 +315,7 @@ export default function App() {
   // Automated AI Risk Analysis based purely on telemetry
   const autoAnalyzeRisk = async (telemetry: any) => {
     setIsAnalyzing(true);
+    setDirectiveShards([]);
     try {
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -220,23 +372,40 @@ export default function App() {
   // Fetch telemetry on mount and set interval
   useEffect(() => {
     let isMounted = true;
+    let interval: any;
     
     const init = async () => {
-      const telemetry = await fetchRealTelemetry();
-      if (telemetry && isMounted) {
-        autoAnalyzeRisk(telemetry);
+      let location = { lat: 37.7749, lng: -122.4194 }; // Default
+      
+      try {
+        if ('geolocation' in navigator) {
+          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+          });
+          location = { lat: position.coords.latitude, lng: position.coords.longitude };
+        }
+      } catch (geoError) {
+        console.warn("Geolocation failed or denied, using default coordinates.", geoError);
+      }
+      
+      if (isMounted) {
+        setPiLocation(location);
+        const telemetry = await fetchRealTelemetry(location);
+        if (telemetry) {
+          autoAnalyzeRisk(telemetry);
+        }
+        
+        interval = setInterval(() => {
+          fetchRealTelemetry(location);
+        }, 60000); // Update every minute
       }
     };
     
     init();
     
-    const interval = setInterval(() => {
-      fetchRealTelemetry();
-    }, 60000); // Update every minute
-    
     return () => {
       isMounted = false;
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
     };
   }, []);
 
@@ -249,13 +418,49 @@ export default function App() {
   const [historicalRange, setHistoricalRange] = useState<'7d' | '14d' | '30d'>('7d');
   const [historicalData, setHistoricalData] = useState<any[]>([]);
   const [isFetchingHistory, setIsFetchingHistory] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportMetrics, setExportMetrics] = useState({
+    temp: true,
+    humidity: true,
+    pressure: true
+  });
+
+  const exportHistoricalToCSV = () => {
+    if (historicalData.length === 0) return;
+
+    // Create CSV header
+    const headers = ['Time'];
+    if (exportMetrics.temp) headers.push('Temperature (°C)');
+    if (exportMetrics.humidity) headers.push('Humidity (%)');
+    if (exportMetrics.pressure) headers.push('Pressure (hPa)');
+    
+    // Create CSV rows
+    const rows = historicalData.map(data => {
+      const row = [data.time];
+      if (exportMetrics.temp) row.push(data.temp);
+      if (exportMetrics.humidity) row.push(data.humidity);
+      if (exportMetrics.pressure) row.push(data.pressure);
+      return row.join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `telemetry_export_${historicalRange}_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setIsExportModalOpen(false);
+  };
 
   // Fetch Historical Telemetry
-  const fetchHistoricalTelemetry = async (days: number) => {
+  const fetchHistoricalTelemetry = async (days: number, location: {lat: number, lng: number}) => {
     setIsFetchingHistory(true);
     try {
-      const lat = 37.7749;
-      const lon = -122.4194;
+      const { lat, lng: lon } = location;
       
       const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&past_days=${days}&hourly=temperature_2m,relative_humidity_2m,surface_pressure`);
       const data = await res.json();
@@ -286,11 +491,11 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (activeTab === 'telemetry') {
+    if (activeTab === 'telemetry' && piLocation) {
       const days = historicalRange === '7d' ? 7 : (historicalRange === '14d' ? 14 : 30);
-      fetchHistoricalTelemetry(days);
+      fetchHistoricalTelemetry(days, piLocation);
     }
-  }, [historicalRange, activeTab]);
+  }, [historicalRange, activeTab, piLocation]);
 
   const [nodes] = useState([
     { id: 'Node Alpha', role: 'Primary - Sense HAT', status: 'Active', ip: '10.0.0.15', detail: 'Capturing telemetry' },
@@ -306,6 +511,42 @@ export default function App() {
 
   const [isGeneratingProof, setIsGeneratingProof] = useState(false);
   const [isLedgerOpen, setIsLedgerOpen] = useState(false);
+
+  const [directiveShards, setDirectiveShards] = useState<{ id: string, hash: string, content: string }[]>([]);
+  const [isSharding, setIsSharding] = useState(false);
+
+  const shardDirectives = async () => {
+    if (!riskReport) return;
+    setIsSharding(true);
+    
+    // Simulate cryptographic sharding delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // Split the report into paragraphs/sections to represent shards
+    const chunks = riskReport.split('\n\n').filter(chunk => chunk.trim().length > 0);
+    
+    const newShards = chunks.map((chunk, index) => {
+      // Simple mock hash generation for the shard
+      const dataString = chunk + Date.now() + index;
+      let hash = 0;
+      for (let i = 0; i < dataString.length; i++) {
+        const char = dataString.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+      }
+      const hexHash = '0x' + Math.abs(hash).toString(16).padStart(8, '0') + Math.floor(Math.random() * 10000).toString(16).padStart(4, '0');
+      
+      return {
+        id: `Shard-${index + 1}`,
+        hash: hexHash,
+        content: chunk
+      };
+    });
+    
+    setDirectiveShards(newShards);
+    saveToLocker(newShards, riskReport, riskLevel);
+    setIsSharding(false);
+  };
 
   const generateZeddProof = async () => {
     setIsGeneratingProof(true);
@@ -343,6 +584,7 @@ export default function App() {
     setIsAnalyzing(true);
     setRiskReport(null);
     setRiskLevel(null);
+    setDirectiveShards([]);
 
     try {
       const reader = new FileReader();
@@ -442,25 +684,12 @@ export default function App() {
     setMapLinks([]);
 
     try {
-      // Try to get user's location, fallback to default construction site coordinates
-      let lat = 37.7749;
-      let lng = -122.4194;
-      
-      try {
-        if ('geolocation' in navigator) {
-          const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
-          });
-          lat = position.coords.latitude;
-          lng = position.coords.longitude;
-        }
-      } catch (geoError) {
-        console.warn("Geolocation failed or denied, using default coordinates.", geoError);
-      }
+      const lat = piLocation?.lat || 37.7749;
+      const lng = piLocation?.lng || -122.4194;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Find nearby emergency services, hardware stores, and safe zones near the construction site at ${lat}, ${lng}. Provide a brief logistics report.`,
+        contents: `Find nearby emergency services and hardware stores near this location. Provide a brief logistics report.`,
         config: {
           tools: [{ googleMaps: {} }],
           toolConfig: {
@@ -476,7 +705,9 @@ export default function App() {
       const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
       if (chunks) {
         const links = chunks.map((chunk: any) => chunk.maps).filter(Boolean);
-        setMapLinks(links);
+        // Remove duplicates based on URI
+        const uniqueLinks = Array.from(new Map(links.map(item => [item.uri, item])).values());
+        setMapLinks(uniqueLinks);
       }
     } catch (error: any) {
       console.error("Error fetching map data:", error);
@@ -486,7 +717,7 @@ export default function App() {
       } else if (errStr.includes('500') || errStr.includes('xhr error') || errStr.includes('Rpc failed')) {
         setMapReport("Map service is currently experiencing network issues. Please try again later.");
       } else {
-        setMapReport("An error occurred while fetching map data. Please try again.");
+        setMapReport(`An error occurred while fetching map data: ${error.message || 'Unknown error'}`);
       }
     } finally {
       setIsFetchingMap(false);
@@ -552,6 +783,24 @@ export default function App() {
               Site Map & Logistics
             </div>
           </button>
+          <button 
+            onClick={() => setActiveTab('forecast')}
+            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'forecast' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
+          >
+            <div className="flex items-center">
+              <CalendarDays className="w-4 h-4 mr-2" />
+              Forecast Grounding
+            </div>
+          </button>
+          <button 
+            onClick={() => setActiveTab('locker')}
+            className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'locker' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400 hover:text-slate-300'}`}
+          >
+            <div className="flex items-center">
+              <Archive className="w-4 h-4 mr-2" />
+              Sharding Locker
+            </div>
+          </button>
         </div>
 
         {activeTab === 'telemetry' && (
@@ -577,20 +826,30 @@ export default function App() {
                       <Activity className="w-5 h-5 mr-2 text-rose-400" />
                       Historical Telemetry Trends
                     </h2>
-                    <div className="flex space-x-2">
-                      {(['7d', '14d', '30d'] as const).map((range) => (
-                        <button
-                          key={range}
-                          onClick={() => setHistoricalRange(range)}
-                          className={`px-3 py-1 text-xs font-medium rounded-lg border transition-colors ${
-                            historicalRange === range 
-                              ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' 
-                              : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
-                          }`}
-                        >
-                          {range.toUpperCase()}
-                        </button>
-                      ))}
+                    <div className="flex items-center space-x-4">
+                      <button
+                        onClick={() => setIsExportModalOpen(true)}
+                        disabled={isFetchingHistory || historicalData.length === 0}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors flex items-center"
+                        title="Export CSV"
+                      >
+                        <Download className="w-3.5 h-3.5 mr-1.5" /> Export CSV
+                      </button>
+                      <div className="flex space-x-2">
+                        {(['7d', '14d', '30d'] as const).map((range) => (
+                          <button
+                            key={range}
+                            onClick={() => setHistoricalRange(range)}
+                            className={`px-3 py-1 text-xs font-medium rounded-lg border transition-colors ${
+                              historicalRange === range 
+                                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' 
+                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
+                            }`}
+                          >
+                            {range.toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   
@@ -895,10 +1154,58 @@ export default function App() {
                       <ReactMarkdown>{riskReport}</ReactMarkdown>
                     </div>
                     <div className="mt-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                      <p className="text-xs text-emerald-400 font-mono flex items-center">
-                        <Terminal className="w-3 h-3 mr-2" />
-                        Directive ready for Minima attestation (SHA-256)
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-emerald-400 font-mono flex items-center">
+                          <Terminal className="w-3 h-3 mr-2" />
+                          Directive ready for Minima attestation (SHA-256)
+                        </p>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={exportShards}
+                            disabled={directiveShards.length === 0}
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors flex items-center"
+                            title="Export Shards"
+                          >
+                            <Download className="w-3.5 h-3.5 mr-1.5" /> Export
+                          </button>
+                          <button
+                            onClick={() => importFileRef.current?.click()}
+                            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-medium rounded-lg transition-colors flex items-center"
+                            title="Import Shards"
+                          >
+                            <Upload className="w-3.5 h-3.5 mr-1.5" /> Import
+                          </button>
+                          <input type="file" ref={importFileRef} onChange={importShards} accept=".json" className="hidden" />
+                          <button
+                            onClick={shardDirectives}
+                            disabled={isSharding || directiveShards.length > 0}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-medium rounded-lg transition-colors flex items-center"
+                          >
+                            {isSharding ? (
+                              <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Sharding...</>
+                            ) : directiveShards.length > 0 ? (
+                              <><ShieldCheck className="w-3.5 h-3.5 mr-1.5" /> Sharded</>
+                            ) : (
+                              <><Database className="w-3.5 h-3.5 mr-1.5" /> Shard Directives</>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {directiveShards.length > 0 && (
+                        <div className="mt-4 space-y-2 border-t border-emerald-500/20 pt-4">
+                          <p className="text-xs text-slate-400 mb-2">Shards generated and ready for decentralized storage:</p>
+                          {directiveShards.map(shard => (
+                            <div key={shard.id} className="p-2 bg-[#111] border border-slate-800 rounded flex items-center justify-between">
+                              <div className="flex items-center">
+                                <Database className="w-3 h-3 text-emerald-500 mr-2" />
+                                <span className="text-xs font-mono text-slate-300">{shard.id}</span>
+                              </div>
+                              <span className="text-xs font-mono text-emerald-400/70">{shard.hash}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -914,10 +1221,18 @@ export default function App() {
         {activeTab === 'map' && (
           <div className="bg-[#111] border border-slate-800 rounded-xl p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-              <h2 className="text-lg font-medium flex items-center text-slate-200">
-                <MapIcon className="w-5 h-5 mr-2 text-blue-400" />
-                Site Map & Logistics Grounding
-              </h2>
+              <div>
+                <h2 className="text-lg font-medium flex items-center text-slate-200">
+                  <MapIcon className="w-5 h-5 mr-2 text-blue-400" />
+                  Site Map & Logistics Grounding
+                </h2>
+                {piLocation && (
+                  <p className="text-xs text-slate-500 mt-1 flex items-center">
+                    <MapIcon className="w-3 h-3 mr-1" />
+                    Using Pi Location: {piLocation.lat.toFixed(4)}, {piLocation.lng.toFixed(4)}
+                  </p>
+                )}
+              </div>
               <button 
                 onClick={fetchSiteMapData}
                 disabled={isFetchingMap}
@@ -935,9 +1250,22 @@ export default function App() {
               </div>
             ) : mapReport ? (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 prose prose-invert prose-blue max-w-none bg-[#1a1a1a] p-6 rounded-xl border border-slate-800">
-                  <div className="markdown-body text-sm text-slate-300">
-                    <ReactMarkdown>{mapReport}</ReactMarkdown>
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="h-[400px] w-full bg-[#1a1a1a] rounded-xl border border-slate-800 overflow-hidden">
+                    <iframe 
+                      width="100%" 
+                      height="100%" 
+                      style={{ border: 0 }} 
+                      loading="lazy" 
+                      allowFullScreen 
+                      referrerPolicy="no-referrer-when-downgrade" 
+                      src={`https://maps.google.com/maps?q=${piLocation?.lat || 37.7749},${piLocation?.lng || -122.4194}&z=14&output=embed`}
+                    ></iframe>
+                  </div>
+                  <div className="prose prose-invert prose-blue max-w-none bg-[#1a1a1a] p-6 rounded-xl border border-slate-800">
+                    <div className="markdown-body text-sm text-slate-300">
+                      <ReactMarkdown>{mapReport}</ReactMarkdown>
+                    </div>
                   </div>
                 </div>
                 <div className="bg-[#1a1a1a] p-6 rounded-xl border border-slate-800">
@@ -945,7 +1273,7 @@ export default function App() {
                     <MapIcon className="w-4 h-4 mr-2" />
                     Map Links
                   </h3>
-                  <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
                     {mapLinks.length > 0 ? mapLinks.map((mapData, idx) => (
                       <a 
                         key={idx} 
@@ -973,6 +1301,219 @@ export default function App() {
               <div className="h-64 flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-800 rounded-xl">
                 <MapIcon className="w-12 h-12 text-slate-600 mb-4" />
                 <p>Click "Fetch Local Logistics" to query Google Maps.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'forecast' && (
+          <div className="bg-[#111] border border-slate-800 rounded-xl p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+              <div>
+                <h2 className="text-lg font-medium flex items-center text-slate-200">
+                  <CalendarDays className="w-5 h-5 mr-2 text-indigo-400" />
+                  7-Day Forecast Grounding
+                </h2>
+                {piLocation && (
+                  <p className="text-xs text-slate-500 mt-1 flex items-center">
+                    <MapIcon className="w-3 h-3 mr-1" />
+                    Using Pi Location: {piLocation.lat.toFixed(4)}, {piLocation.lng.toFixed(4)}
+                  </p>
+                )}
+              </div>
+              <button 
+                onClick={analyzeForecast}
+                disabled={isAnalyzing || forecastData.length === 0}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center w-full sm:w-auto"
+              >
+                {isAnalyzing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Activity className="w-4 h-4 mr-2" />}
+                {isAnalyzing ? 'Analyzing Forecast...' : 'Analyze Forecast Risk'}
+              </button>
+            </div>
+
+            {isFetchingForecast ? (
+              <div className="h-64 flex flex-col items-center justify-center text-slate-500 space-y-4">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                <p>Fetching 7-day forecast data...</p>
+              </div>
+            ) : forecastData.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {forecastData.map((day, idx) => (
+                  <div key={idx} className="bg-[#1a1a1a] p-4 rounded-xl border border-slate-800 flex flex-col">
+                    <p className="text-sm font-semibold text-slate-300 mb-3">{day.date}</p>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-slate-500 flex items-center"><Thermometer className="w-3 h-3 mr-1" /> Max Temp</span>
+                        <span className="text-sm text-slate-200">{day.tempMax.toFixed(1)}°C</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-slate-500 flex items-center"><Thermometer className="w-3 h-3 mr-1" /> Min Temp</span>
+                        <span className="text-sm text-slate-200">{day.tempMin.toFixed(1)}°C</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-slate-500 flex items-center"><CloudRain className="w-3 h-3 mr-1" /> Precip</span>
+                        <span className="text-sm text-slate-200">{day.precip.toFixed(1)} mm</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-slate-500 flex items-center"><Wind className="w-3 h-3 mr-1" /> Wind</span>
+                        <span className="text-sm text-slate-200">{day.wind.toFixed(1)} km/h</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-slate-500 flex items-center"><Sun className="w-3 h-3 mr-1" /> UV Index</span>
+                        <span className="text-sm text-slate-200">{day.uv.toFixed(1)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-64 flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-800 rounded-xl">
+                <CalendarDays className="w-12 h-12 text-slate-600 mb-4" />
+                <p>No forecast data available.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'locker' && (
+          <div className="bg-[#111] border border-slate-800 rounded-xl p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+              <h2 className="text-lg font-medium flex items-center text-slate-200">
+                <Archive className="w-5 h-5 mr-2 text-emerald-400" />
+                Sharding Evidence Locker
+              </h2>
+            </div>
+
+            {/* Search and Filter Bar */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input 
+                  type="text" 
+                  placeholder="Search by ID or report content..." 
+                  value={lockerSearch}
+                  onChange={(e) => setLockerSearch(e.target.value)}
+                  className="w-full bg-[#1a1a1a] border border-slate-800 rounded-lg pl-10 pr-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500/50 transition-colors"
+                />
+              </div>
+              <div className="relative w-full sm:w-48">
+                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <select 
+                  value={lockerFilter}
+                  onChange={(e) => setLockerFilter(e.target.value)}
+                  className="w-full bg-[#1a1a1a] border border-slate-800 rounded-lg pl-10 pr-8 py-2 text-sm text-slate-200 appearance-none focus:outline-none focus:border-emerald-500/50 transition-colors cursor-pointer"
+                >
+                  <option value="All">All Risk Levels</option>
+                  <option value="Green">Green (Low)</option>
+                  <option value="Amber">Amber (Elevated)</option>
+                  <option value="Red">Red (High)</option>
+                  <option value="Black">Black (Shutdown)</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+              </div>
+            </div>
+            
+            {lockerEntries.length > 0 ? (
+              <div className="space-y-4">
+                {lockerEntries
+                  .filter(entry => {
+                    const matchesSearch = entry.id.toLowerCase().includes(lockerSearch.toLowerCase()) || 
+                                          (entry.report && entry.report.toLowerCase().includes(lockerSearch.toLowerCase()));
+                    const matchesFilter = lockerFilter === 'All' || entry.riskLevel === lockerFilter;
+                    return matchesSearch && matchesFilter;
+                  })
+                  .map((entry) => (
+                  <div key={entry.id} className="bg-[#1a1a1a] p-5 rounded-xl border border-slate-800 transition-all">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-200 flex items-center">
+                          <Database className="w-4 h-4 mr-2 text-emerald-500" />
+                          {entry.id}
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {new Date(entry.timestamp).toLocaleString()}
+                        </p>
+                      </div>
+                      {entry.riskLevel && (
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${getRiskColor(entry.riskLevel).bg} ${getRiskColor(entry.riskLevel).text}`}>
+                          {entry.riskLevel}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-slate-400 font-medium">Shards ({entry.shards.length}):</p>
+                        <button 
+                          onClick={() => setExpandedLockerId(expandedLockerId === entry.id ? null : entry.id)}
+                          className="text-xs text-slate-400 hover:text-slate-200 flex items-center transition-colors"
+                        >
+                          {expandedLockerId === entry.id ? (
+                            <><ChevronUp className="w-3 h-3 mr-1" /> Hide Details</>
+                          ) : (
+                            <><ChevronDown className="w-3 h-3 mr-1" /> View Details</>
+                          )}
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {entry.shards.slice(0, expandedLockerId === entry.id ? undefined : 2).map((shard: any) => (
+                          <div key={shard.id} className="p-2 bg-slate-900 border border-slate-800 rounded flex items-center justify-between">
+                            <span className="text-[10px] font-mono text-slate-400">{shard.id}</span>
+                            <span className="text-[10px] font-mono text-emerald-500/70 truncate ml-2">{shard.hash}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {expandedLockerId !== entry.id && entry.shards.length > 2 && (
+                        <p className="text-[10px] text-slate-500 italic">+ {entry.shards.length - 2} more shards</p>
+                      )}
+                    </div>
+
+                    {/* Expanded Details */}
+                    {expandedLockerId === entry.id && (
+                      <div className="mt-4 pt-4 border-t border-slate-800 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <p className="text-xs text-slate-400 font-medium mb-2">Reconstructed Report Snippet:</p>
+                        <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 max-h-48 overflow-y-auto">
+                          <div className="markdown-body text-xs text-slate-300">
+                            <ReactMarkdown>{entry.report}</ReactMarkdown>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="mt-4 pt-4 border-t border-slate-800 flex justify-end">
+                      <button 
+                        onClick={() => {
+                          setDirectiveShards(entry.shards);
+                          setRiskReport(entry.report);
+                          setRiskLevel(entry.riskLevel);
+                          setActiveTab('risk');
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-xs font-medium rounded-lg transition-colors flex items-center"
+                      >
+                        <Activity className="w-3.5 h-3.5 mr-1.5" />
+                        Load into Risk Analysis View
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                
+                {lockerEntries.filter(entry => {
+                    const matchesSearch = entry.id.toLowerCase().includes(lockerSearch.toLowerCase()) || 
+                                          (entry.report && entry.report.toLowerCase().includes(lockerSearch.toLowerCase()));
+                    const matchesFilter = lockerFilter === 'All' || entry.riskLevel === lockerFilter;
+                    return matchesSearch && matchesFilter;
+                  }).length === 0 && (
+                  <div className="p-8 text-center text-slate-500 border border-slate-800 rounded-xl bg-[#1a1a1a]">
+                    <Search className="w-8 h-8 mx-auto mb-3 text-slate-600" />
+                    <p>No shards match your search criteria.</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="h-64 flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-800 rounded-xl">
+                <Archive className="w-12 h-12 text-slate-600 mb-4" />
+                <p>Locker is empty. Generate and shard directives to store them here.</p>
               </div>
             )}
           </div>
@@ -1017,6 +1558,80 @@ export default function App() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {isExportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#111] border border-slate-800 rounded-xl w-full max-w-md flex flex-col">
+            <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-slate-200 flex items-center">
+                <Download className="w-5 h-5 mr-2 text-emerald-400" />
+                Export Historical Data
+              </h2>
+              <button onClick={() => setIsExportModalOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div>
+                <h3 className="text-sm font-medium text-slate-300 mb-3">Select Metrics to Export</h3>
+                <div className="space-y-3">
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={exportMetrics.temp}
+                      onChange={(e) => setExportMetrics(prev => ({ ...prev, temp: e.target.checked }))}
+                      className="form-checkbox h-4 w-4 text-emerald-500 rounded border-slate-700 bg-slate-900 focus:ring-emerald-500 focus:ring-offset-slate-900"
+                    />
+                    <span className="text-sm text-slate-400 flex items-center"><Thermometer className="w-4 h-4 mr-2 text-rose-400" /> Temperature</span>
+                  </label>
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={exportMetrics.humidity}
+                      onChange={(e) => setExportMetrics(prev => ({ ...prev, humidity: e.target.checked }))}
+                      className="form-checkbox h-4 w-4 text-emerald-500 rounded border-slate-700 bg-slate-900 focus:ring-emerald-500 focus:ring-offset-slate-900"
+                    />
+                    <span className="text-sm text-slate-400 flex items-center"><Droplets className="w-4 h-4 mr-2 text-blue-400" /> Humidity</span>
+                  </label>
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={exportMetrics.pressure}
+                      onChange={(e) => setExportMetrics(prev => ({ ...prev, pressure: e.target.checked }))}
+                      className="form-checkbox h-4 w-4 text-emerald-500 rounded border-slate-700 bg-slate-900 focus:ring-emerald-500 focus:ring-offset-slate-900"
+                    />
+                    <span className="text-sm text-slate-400 flex items-center"><Wind className="w-4 h-4 mr-2 text-slate-400" /> Pressure</span>
+                  </label>
+                </div>
+              </div>
+              
+              <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-800">
+                <p className="text-xs text-slate-400">
+                  Exporting data for the selected range: <strong className="text-emerald-400">{historicalRange.toUpperCase()}</strong>.
+                  The CSV will include {historicalData.length} data points.
+                </p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-800 flex justify-end space-x-3">
+              <button 
+                onClick={() => setIsExportModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={exportHistoricalToCSV}
+                disabled={!exportMetrics.temp && !exportMetrics.humidity && !exportMetrics.pressure}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition-colors flex items-center"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download CSV
+              </button>
             </div>
           </div>
         </div>
