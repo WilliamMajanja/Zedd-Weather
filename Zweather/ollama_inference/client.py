@@ -98,7 +98,7 @@ class OllamaClient:
         uv = telemetry.get("uv_index", "N/A")
         rainfall = telemetry.get("rainfall_mm", "N/A")
 
-        prompt = f"""You are an agricultural weather analyst. Analyse the following weather sensor 
+        prompt = f"""You are an agricultural weather analyst. Analyze the following weather sensor
 readings and provide a concise assessment suitable for a farmer growing {crop}.
 
 Current Conditions:

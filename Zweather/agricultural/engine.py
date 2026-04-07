@@ -104,8 +104,15 @@ class AgriculturalEngine:
 
         # Simplified daily ET estimate (mm/day) using Hargreaves-like approximation
         # Reference ET ≈ 0.0135 * (T + 17.8) * solar_fraction
-        solar_fraction = max(0.1, (100.0 - humidity) / 100.0)  # proxy: dry = sunny
-        et_daily = 0.0135 * (temp + 17.8) * solar_fraction * 10.0  # scale to ~mm
+        # MIN_SOLAR_FRACTION: even under fully overcast/humid conditions some solar
+        # radiation reaches the crop, so we floor the proxy at 10 % to avoid zero ET.
+        _MIN_SOLAR_FRACTION = 0.1
+        solar_fraction = max(_MIN_SOLAR_FRACTION, (100.0 - humidity) / 100.0)  # proxy: dry = sunny
+        # The 10.0 multiplier scales the dimensionless Hargreaves coefficient to
+        # realistic daily mm/day values (calibrated to ~2–8 mm/day across typical
+        # temperature and humidity ranges for tropical/subtropical climates).
+        _ET_MM_SCALE = 10.0
+        et_daily = 0.0135 * (temp + 17.8) * solar_fraction * _ET_MM_SCALE
 
         # Start from an assumed "field capacity" baseline (VWC ~35 %)
         baseline_vwc = 35.0
