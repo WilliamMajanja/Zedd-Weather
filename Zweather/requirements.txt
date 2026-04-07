@@ -1,5 +1,8 @@
 # Zedd Weather - Python Dependencies
-# Node 1 (Telemetry) and Node 2 (Orchestration)
+# Node 1 (Telemetry), Node 2 (Orchestration), and Edge InfluxDB Publisher
+
+# InfluxDB v2 time-series client (used by app.py / edge publisher)
+influxdb-client>=3.0.0
 
 # MQTT
 paho-mqtt>=1.6.1,<2.0

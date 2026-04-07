@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zedd-weather-edge
+  namespace: zedd-weather
+  labels:
+    app: zedd-weather-edge
+    app.kubernetes.io/part-of: zedd-weather
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zedd-weather-edge
+  template:
+    metadata:
+      labels:
+        app: zedd-weather-edge
+    spec:
+      # Must run on pinet-rho which has the physical Sense HAT
+      nodeSelector:
+        sensor: sense-hat
+      # Allow access to I2C devices on the host for Sense HAT communication
+      hostPID: false
+      hostNetwork: false
+      containers:
+        - name: zedd-weather-edge
+          image: ghcr.io/williamMajanja/zedd-weather-edge:latest
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: zedd-weather-config
+            - secretRef:
+                name: zedd-weather-secrets
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          # Run as root is required to access /dev/i2c-* on the host
+          securityContext:
+            privileged: true
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "test -f /tmp/zedd-alive && test $(( $(date +%s) - $(date -r /tmp/zedd-alive +%s) )) -lt 60"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          volumeMounts:
+            - name: i2c-dev
+              mountPath: /dev/i2c-1
+            - name: i2c-dev-0
+              mountPath: /dev/i2c-0
+      volumes:
+        - name: i2c-dev
+          hostPath:
+            path: /dev/i2c-1
+            type: CharDevice
+        - name: i2c-dev-0
+          hostPath:
+            path: /dev/i2c-0
+            type: CharDevice
+      restartPolicy: Always

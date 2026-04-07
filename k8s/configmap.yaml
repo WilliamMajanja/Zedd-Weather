@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: influxdb-config
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+data:
+  DOCKER_INFLUXDB_INIT_MODE: "setup"
+  DOCKER_INFLUXDB_INIT_ORG: "zedd-weather"
+  DOCKER_INFLUXDB_INIT_BUCKET: "telemetry"
+  DOCKER_INFLUXDB_INIT_RETENTION: "30d"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zedd-weather-config
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+data:
+  # InfluxDB connection (service DNS within cluster)
+  INFLUXDB_URL: "http://influxdb.zedd-weather.svc.cluster.local:8086"
+  INFLUXDB_ORG: "zedd-weather"
+  INFLUXDB_BUCKET: "telemetry"
+
+  # Sense HAT sensor settings
+  SENSE_HAT_ENABLED: "true"
+  SENSE_HAT_TEMP_OFFSET: "2.0"
+  PUBLISH_INTERVAL: "10.0"
+
+  # Alert thresholds
+  ALERT_TEMP_HIGH_C: "35.0"
+  ALERT_TEMP_LOW_C: "0.0"
+  ALERT_WIND_SPEED_MS: "20.0"
+  ALERT_UV_INDEX: "8.0"
+  ALERT_AQI: "150.0"
+
+  # Optional sensors (disabled by default)
+  RAIN_GAUGE_ENABLED: "false"
+  UV_SENSOR_ENABLED: "false"
+  ENVIRO_PLUS_ENABLED: "false"
+  MODBUS_ENABLED: "false"
+
+  # Ollama (pinet-sigma) – used by node2 orchestration for local AI inference
+  OLLAMA_BASE_URL: "http://10.0.0.20:11434"
+
+  # Logging
+  LOG_LEVEL: "INFO"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: zedd-weather
+  labels:
+    app.kubernetes.io/part-of: zedd-weather
+data:
+  GF_SECURITY_ADMIN_USER: "admin"
+  GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s:%(http_port)s/"
+  GF_INSTALL_PLUGINS: "grafana-clock-panel,grafana-simple-json-datasource"

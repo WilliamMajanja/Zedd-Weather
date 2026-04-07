@@ -1,0 +1,102 @@
+# Zedd Weather – Local Development Docker Compose
+# ---------------------------------------------------------------------------
+# Spins up the full stack locally so you can develop and test without a K3s
+# cluster.  Copy .env.example to .env and fill in the token values before
+# running:
+#
+#   cp .env.example .env          # edit with your values
+#   docker compose up -d
+#
+# Services exposed on localhost:
+#   InfluxDB  → http://localhost:8086   (UI + API)
+#   Grafana   → http://localhost:3000
+#   Open WebUI → http://localhost:8080  (requires Ollama accessible externally)
+# ---------------------------------------------------------------------------
+
+version: "3.9"
+
+services:
+
+  # ── InfluxDB v2 (time-series database) ──────────────────────────────────
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: zedd-influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${DOCKER_INFLUXDB_INIT_USERNAME:-admin}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${DOCKER_INFLUXDB_INIT_PASSWORD:-changeme-password}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-zedd-weather}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-telemetry}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN:-changeme-token}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Grafana (dashboards) ─────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: zedd-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${DOCKER_INFLUXDB_INIT_USERNAME:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${DOCKER_INFLUXDB_INIT_PASSWORD:-changeme-password}
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      influxdb:
+        condition: service_healthy
+
+  # ── Open WebUI (Ollama front-end) ─────────────────────────────────────────
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: zedd-open-webui
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Point to a locally running Ollama instance or pinet-sigma
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    volumes:
+      - open-webui-data:/app/backend/data
+
+  # ── Zedd Weather Edge Publisher (simulated – requires Sense HAT) ─────────
+  # NOTE: This service will only run correctly on a Raspberry Pi with a
+  # Sense HAT attached.  On a standard Linux/Mac development machine it will
+  # fail to import sense_hat and exit immediately – this is expected.
+  zedd-weather-edge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zedd-edge
+    restart: unless-stopped
+    environment:
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_TOKEN: ${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN:-changeme-token}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:-zedd-weather}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-telemetry}
+      PUBLISH_INTERVAL: ${PUBLISH_INTERVAL:-10.0}
+      SENSE_HAT_TEMP_OFFSET: ${SENSE_HAT_TEMP_OFFSET:-2.0}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    devices:
+      - /dev/i2c-1:/dev/i2c-1
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    profiles:
+      # Only start with: docker compose --profile edge up
+      - edge
+
+volumes:
+  influxdb-data:
+  grafana-data:
+  open-webui-data:
