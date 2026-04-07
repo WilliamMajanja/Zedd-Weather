@@ -44,9 +44,9 @@ spec:
           # Zweather package) with an explicit command override to run the
           # agricultural analysis entry-point instead of the default edge
           # collector.  Replace with a dedicated
-          # ghcr.io/williamluke/zedd-weather-agricultural:latest image once
+          # ghcr.io/williammajanja/zedd-weather-agricultural:latest image once
           # the agricultural service grows to require different system deps.
-          image: ghcr.io/williamluke/zedd-weather-edge:latest
+          image: ghcr.io/williammajanja/zedd-weather-edge:latest
           imagePullPolicy: Always
 
           # Entry-point that runs crop-model analysis and irrigation scheduling.

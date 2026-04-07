@@ -30,7 +30,7 @@ services:
       DOCKER_INFLUXDB_INIT_PASSWORD: ${DOCKER_INFLUXDB_INIT_PASSWORD:-changeme123}
       DOCKER_INFLUXDB_INIT_ORG:      ${DOCKER_INFLUXDB_INIT_ORG:-zedd-weather}
       DOCKER_INFLUXDB_INIT_BUCKET:   ${DOCKER_INFLUXDB_INIT_BUCKET:-telemetry}
-      DOCKER_INFLUXDB_INIT_TOKEN:    ${INFLUXDB_TOKEN:-dev-token-changeme}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-dev-token-changeme}
       DOCKER_INFLUXDB_INIT_RETENTION: "30d"
     volumes:
       - influxdb-data:/var/lib/influxdb2

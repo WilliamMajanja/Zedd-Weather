@@ -43,7 +43,7 @@ spec:
 
       containers:
         - name: edge-collector
-          image: ghcr.io/williamluke/zedd-weather-edge:latest
+          image: ghcr.io/williammajanja/zedd-weather-edge:latest
           imagePullPolicy: Always
 
           securityContext:
