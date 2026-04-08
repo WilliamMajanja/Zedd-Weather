@@ -2,7 +2,7 @@
 # Node 1 (Telemetry), Node 2 (Orchestration), and Edge InfluxDB Publisher
 
 # InfluxDB v2 time-series client (used by app.py / edge publisher)
-influxdb-client>=3.0.0
+influxdb-client>=1.50.0,<2.0
 
 # MQTT
 paho-mqtt>=1.6.1,<2.0
@@ -31,9 +31,6 @@ pyserial>=3.5
 google-genai>=1.0.0
 aiohttp>=3.13.3
 python-dotenv>=1.0.0
-
-# InfluxDB client (Node 1 edge collector + agricultural engine)
-influxdb-client>=3.0.0
 
 # Testing
 pytest>=8.0.0

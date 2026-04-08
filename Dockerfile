@@ -8,7 +8,7 @@
 # Install Python dependencies, skipping hardware-only RPi libraries that
 # cannot be built outside of a Raspberry Pi environment.
 # ---------------------------------------------------------------------------
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim-trixie AS builder
 
 WORKDIR /build
 
@@ -36,7 +36,7 @@ RUN pip install --upgrade pip && \
 # Stage 2 – Runtime
 # Lean image that only contains application code + installed packages.
 # ---------------------------------------------------------------------------
-FROM python:3.12-slim AS runtime
+FROM python:3.12-slim-trixie AS runtime
 
 # Metadata labels (OCI standard)
 LABEL org.opencontainers.image.title="zedd-weather-edge"

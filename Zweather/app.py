@@ -36,9 +36,9 @@ import sqlite3
 import sys
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Generator, List, Optional
+from typing import Any, Generator, List, Optional
 
 # ---------------------------------------------------------------------------
 # Optional heavy imports – guarded so the module loads on non-Pi hosts too
@@ -51,10 +51,11 @@ except ImportError:
 
 try:
     from influxdb_client import InfluxDBClient, Point, WritePrecision  # type: ignore
-    from influxdb_client.client.write_api import SYNCHRONOUS  # type: ignore
+    from influxdb_client.client.write_api import SYNCHRONOUS, WriteApi  # type: ignore
     _INFLUXDB_AVAILABLE = True
 except ImportError:
     _INFLUXDB_AVAILABLE = False
+    WriteApi = Any  # type: ignore[misc,assignment]
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -177,7 +178,7 @@ def buffer_reading(conn: sqlite3.Connection, reading: TelemetryReading) -> None:
 
 def flush_buffer(
     conn: sqlite3.Connection,
-    write_api: "WriteApi",  # type: ignore[name-defined]
+    write_api: WriteApi,
     node_name: str,
 ) -> int:
     """
@@ -376,12 +377,12 @@ def touch_liveness() -> None:
 
 def _write_with_retry(
     reading: TelemetryReading,
-    write_api: "WriteApi",  # type: ignore[name-defined]
+    write_api: WriteApi,
     db_conn: sqlite3.Connection,
     node_name: str,
     consecutive_failures: int,
     max_failures: int,
-) -> tuple[int, "WriteApi"]:  # type: ignore[name-defined]
+) -> tuple[int, WriteApi]:
     """
     Attempt to write a single reading to InfluxDB.
     On failure: buffer locally and potentially reconnect.
