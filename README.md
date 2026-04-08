@@ -140,7 +140,7 @@ Alternatively, run a shared MQTT broker on Node A and point both workers at it b
 
 | Variable | Default | Description |
 |---|---|---|
-| `MQTT_BROKER_HOST` | `localhost` | MQTT broker hostname / IP |
+| `MQTT_BROKER_HOST` | `mqtt-broker` (compose) / `localhost` (bare-metal) | MQTT broker hostname / IP |
 | `MQTT_BROKER_PORT` | `1883` | MQTT broker port |
 | `MQTT_TOPIC` | `weather_station/telemetry` | MQTT topic for telemetry data |
 | `SENSE_HAT_ENABLED` | `true` | Enable real Sense HAT hardware |
