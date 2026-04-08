@@ -62,13 +62,19 @@ Services:
 ### 4) Start AI worker + sensory worker simulation
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.cluster.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.cluster.yml up -d
 ```
 
 This starts:
 - `mqtt-broker`
 - `zedd-ai-worker`
 - `zedd-sensory-worker`
+
+Use `--build` only after local code or Dockerfile changes:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.cluster.yml up -d --build
+```
 
 ### 5) Optional frontend development
 
