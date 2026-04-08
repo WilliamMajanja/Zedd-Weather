@@ -10,8 +10,8 @@ Responsibilities:
   3. Write batched data points to InfluxDB.
   4. Buffer data locally in SQLite when InfluxDB is unreachable, and flush
      the buffer once connectivity is restored.
-  5. Touch /tmp/zedd-alive after every successful cycle so the K3s
-     liveness probe can detect hangs.
+  5. Touch /tmp/zedd-alive after every successful cycle so container
+     health checks can detect hangs.
 
 Environment variables (all optional – sensible defaults provided):
   INFLUXDB_URL            InfluxDB base URL              (default: http://localhost:8086)
@@ -364,7 +364,7 @@ def _build_write_api():
 # ---------------------------------------------------------------------------
 
 def touch_liveness() -> None:
-    """Touch /tmp/zedd-alive so the K3s liveness probe knows we're healthy."""
+    """Touch /tmp/zedd-alive so liveness checks know we're healthy."""
     try:
         LIVENESS_FILE.touch()
     except OSError as exc:

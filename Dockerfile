@@ -63,12 +63,11 @@ COPY Zweather/ ./Zweather/
 # Ensure the package is importable
 RUN touch Zweather/__init__.py 2>/dev/null || true
 
-# SQLite buffer and liveness probe live under /tmp (world-writable at runtime)
-# The liveness probe touches /tmp/zedd-alive; K3s mounts an emptyDir there.
+# SQLite buffer and liveness probe live under /tmp (world-writable at runtime).
 VOLUME ["/tmp"]
 
-# Switch to non-root user (overridden to root in the edge K3s pod which
-# needs privileged I2C access; see k3s/zedd-weather-edge-deployment.yaml)
+# Switch to non-root user (override only for hardware-specific local runs that
+# need privileged I2C access).
 USER appuser
 
 ENV PYTHONUNBUFFERED=1 \
