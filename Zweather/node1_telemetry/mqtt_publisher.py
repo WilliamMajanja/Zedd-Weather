@@ -83,6 +83,8 @@ def main():
 
     max_retries = 30
     retry_count = 0
+    _BACKOFF_BASE_S = 5
+    _BACKOFF_MAX_S = 60
     while True:
         try:
             client.connect(config.MQTT_BROKER, config.MQTT_PORT, keepalive=60)
@@ -94,7 +96,7 @@ def main():
                 logger.critical("MQTT connection failed after %d retries. Exiting.", max_retries)
                 sensor_mgr.cleanup()
                 return
-            backoff = min(5 * retry_count, 60)
+            backoff = min(_BACKOFF_BASE_S * retry_count, _BACKOFF_MAX_S)
             logger.error("MQTT connection failed (%d/%d): %s. Retrying in %d s …", retry_count, max_retries, exc, backoff)
             time.sleep(backoff)
 
