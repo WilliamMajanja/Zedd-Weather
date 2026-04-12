@@ -94,9 +94,9 @@ export function recordEvaluation(pipelineRunId, scores) {
   });
 
   // Keep last 100 evaluations
-  if (existing.length > 100) existing.splice(0, existing.length - 100);
+  const trimmed = existing.length > 100 ? existing.slice(-100) : existing;
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
 }
 
 /**

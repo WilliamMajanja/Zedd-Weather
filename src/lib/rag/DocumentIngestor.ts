@@ -4,9 +4,11 @@
  * Uses LangChain to load, chunk, and embed "UK Legislation" and "HSE Guidance"
  * documents into a Pinecone vector store.
  *
- * This module is designed to run server-side (Node / edge runtime) because it
- * requires network access to Pinecone and the OpenAI embeddings endpoint.
- * From the React front-end it is consumed indirectly through the agent layer.
+ * ⚠️ SERVER-SIDE ONLY — This module is designed to run in Node / edge runtime
+ * because it requires network access to Pinecone and the OpenAI embeddings
+ * endpoint.  API keys are read from server-side environment variables and must
+ * never be exposed in client bundles.  From the React front-end this module is
+ * consumed indirectly through the agent layer or a backend proxy.
  */
 
 // ---------------------------------------------------------------------------

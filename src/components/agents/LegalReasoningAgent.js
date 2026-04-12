@@ -133,8 +133,11 @@ function retrieveRelevantLegal(constraints) {
 export async function applyLegalReasoning(weather, constraints) {
   const references = retrieveRelevantLegal(constraints);
 
-  const openaiKey = typeof process !== 'undefined'
-    ? process.env?.OPENAI_API_KEY
+  // NOTE: In a production deployment, API calls to OpenAI should be proxied
+  // through a backend endpoint to protect the API key. The key is read from
+  // the Vite build-time environment here for development convenience only.
+  const openaiKey = typeof import.meta !== 'undefined'
+    ? import.meta.env?.VITE_OPENAI_API_KEY
     : undefined;
 
   if (!openaiKey) {

@@ -4,6 +4,10 @@
  * Configuration for the Meteomatics Weather API that replaces / augments the
  * existing OpenWeatherMap (now Open-Meteo) logic used by the telemetry layer.
  *
+ * ⚠️ SERVER-SIDE ONLY — Meteomatics uses Basic-auth credentials which must
+ * never be exposed in client bundles.  In the browser the Meteomatics data is
+ * fetched via a backend proxy (e.g. the Node2 orchestrator).
+ *
  * The Meteomatics API provides high-resolution, hyper-local forecast data that
  * is critical for construction site decision-making.
  */

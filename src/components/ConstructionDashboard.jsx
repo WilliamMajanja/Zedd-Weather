@@ -289,6 +289,20 @@ function ChatSidebar({ messages, input, onInputChange, onSend }) {
 }
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const ACTIVITIES = [
+  { value: 'general', label: 'General Construction' },
+  { value: 'crane_operations', label: 'Crane Operations' },
+  { value: 'concrete_pouring', label: 'Concrete Pouring' },
+  { value: 'roofing', label: 'Roofing' },
+  { value: 'excavation', label: 'Excavation' },
+  { value: 'steel_erection', label: 'Steel Erection' },
+  { value: 'painting', label: 'Painting / Coating' },
+];
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -330,8 +344,9 @@ export default function ConstructionDashboard({ weather }) {
       dispatch({ type: 'PIPELINE_DONE', result });
 
       // Run evaluation
+      const activityLabel = ACTIVITIES.find((a) => a.value === selectedActivity)?.label ?? selectedActivity;
       const evalInput = {
-        query: `Weather assessment for ${selectedActivity} activity. Temperature ${weather?.temp ?? 0}°C, wind ${weather?.windSpeed ?? 0} m/s.`,
+        query: `Weather assessment for ${activityLabel} activity. Temperature ${weather?.temp ?? 0}°C, wind ${weather?.windSpeed ?? 0} m/s.`,
         retrievedDocs: (result.legalReasoning?.references ?? []).map(
           (r) => r.relevantText,
         ),
@@ -348,7 +363,7 @@ export default function ConstructionDashboard({ weather }) {
   // Auto-run on mount and when weather changes significantly
   useEffect(() => {
     if (weather) runPipeline();
-  }, [weather?.temp, weather?.windSpeed, selectedActivity]);
+  }, [weather?.temp, weather?.windSpeed, selectedActivity, runPipeline]);
 
   // Chat handler (simple echo; in production wired to LLM)
   const handleChatSend = useCallback(() => {
@@ -370,17 +385,6 @@ export default function ConstructionDashboard({ weather }) {
     });
     dispatch({ type: 'SET_CHAT_INPUT', value: '' });
   }, [state.chatInput, state.decision, state.legalReasoning]);
-
-  // Activity options
-  const ACTIVITIES = [
-    { value: 'general', label: 'General Construction' },
-    { value: 'crane_operations', label: 'Crane Operations' },
-    { value: 'concrete_pouring', label: 'Concrete Pouring' },
-    { value: 'roofing', label: 'Roofing' },
-    { value: 'excavation', label: 'Excavation' },
-    { value: 'steel_erection', label: 'Steel Erection' },
-    { value: 'painting', label: 'Painting / Coating' },
-  ];
 
   return (
     <div className="space-y-4">
