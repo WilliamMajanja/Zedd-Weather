@@ -176,7 +176,7 @@ export function useTelemetry() {
         await fetchRealTelemetry(location);
 
         interval = setInterval(() => {
-          fetchRealTelemetry(location);
+          fetchRealTelemetry(piLocationRef.current);
         }, TELEMETRY_REFRESH_INTERVAL_MS);
       }
     };
