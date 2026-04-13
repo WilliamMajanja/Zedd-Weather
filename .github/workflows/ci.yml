@@ -36,7 +36,8 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install paho-mqtt influxdb-client python-dotenv google-genai aiohttp \
-            pymodbus pyserial smbus2 requests flake8 mypy pytest pytest-mock
+            pymodbus pyserial smbus2 requests fastapi uvicorn httpx \
+            flake8 mypy pytest pytest-mock
 
       - name: Flake8
         run: |
@@ -66,7 +67,8 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install paho-mqtt influxdb-client python-dotenv google-genai aiohttp \
-            pymodbus pyserial smbus2 requests flake8 mypy pytest pytest-mock
+            pymodbus pyserial smbus2 requests fastapi uvicorn httpx \
+            flake8 mypy pytest pytest-mock
 
       - name: Run tests
         run: pytest Zweather/tests/ -v --tb=short
