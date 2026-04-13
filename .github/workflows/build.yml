@@ -41,7 +41,8 @@ jobs:
         run: |
           pip install --upgrade pip
           # Install only the packages available on standard Linux (skip RPi-specific ones)
-          pip install paho-mqtt influxdb-client python-dotenv google-genai aiohttp pymodbus pyserial smbus2
+          pip install paho-mqtt influxdb-client python-dotenv google-genai aiohttp pymodbus pyserial smbus2 \
+            fastapi uvicorn httpx
           pip install flake8 mypy
 
       - name: Flake8
