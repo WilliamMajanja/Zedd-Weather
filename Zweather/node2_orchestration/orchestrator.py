@@ -42,6 +42,10 @@ class ZeddOrchestrator:
     def __init__(self):
         self.latest_telemetry = None
         self.mqtt_client = mqtt.Client(client_id="node2_orchestrator")
+        self.mqtt_client.username_pw_set(
+            os.environ.get("MQTT_USERNAME", ""),
+            os.environ.get("MQTT_PASSWORD", ""),
+        )
         self.mqtt_client.on_connect = self.on_connect
         self.mqtt_client.on_message = self.on_message
         self.session = None
@@ -88,24 +92,54 @@ class ZeddOrchestrator:
             return None
 
     def run_inference(self, micro_data, macro_data):
-        """Cross-references micro/macro data to generate mitigation directives."""
+        """Run sector-specific analysis using the heuristic engines."""
         if not micro_data:
             return None
-        
-        # Placeholder for actual ML inference (e.g., ONNX runtime)
-        temp = micro_data.get("temperature_c", 0)
-        directive = "NORMAL_OPERATIONS"
-        
-        if temp > 35.0:
-            directive = "HALT_HEAVY_MACHINERY_HEAT_RISK"
-        elif temp < 0.0:
-            directive = "APPLY_FROST_MITIGATION"
-            
-        return {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "micro_temp": temp,
-            "directive": directive
+
+        sector = os.environ.get("ACTIVE_SECTOR", "construction").lower()
+
+        # Map telemetry keys to engine format
+        telemetry = {
+            "temperature": micro_data.get("temperature_c", micro_data.get("local_temp_c", 20.0)),
+            "humidity": micro_data.get("humidity_pct", micro_data.get("local_humidity_pct", 60.0)),
+            "pressure": micro_data.get("pressure_hpa", micro_data.get("local_pressure_hpa", 1013.0)),
         }
+
+        # Add optional fields
+        for key in ("wind_speed", "uv_index", "rainfall_mm", "aqi"):
+            if key in micro_data:
+                telemetry[key] = micro_data[key]
+
+        try:
+            if sector == "construction":
+                from Zweather.construction.engine import ConstructionEngine
+                engine = ConstructionEngine()
+                result = engine.analyze(telemetry)
+            elif sector == "agricultural":
+                from Zweather.agricultural.engine import AgriculturalEngine
+                engine = AgriculturalEngine()
+                result = engine.analyze(telemetry)
+            elif sector == "industrial":
+                from Zweather.industrial.engine import IndustrialEngine
+                engine = IndustrialEngine()
+                result = engine.analyze(telemetry)
+            else:
+                result = {"error": f"Unknown sector: {sector}"}
+
+            return {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "sector": sector,
+                "analysis": result,
+                "directive": result.get("risk_level", "unknown"),
+            }
+        except Exception as e:
+            logging.error("Sector engine analysis failed: %s", e)
+            return {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "sector": sector,
+                "directive": "ANALYSIS_FAILED",
+                "error": str(e),
+            }
 
     def attest_directive(self, directive_payload):
         """Cryptographically signs the directive for the decentralized ledger."""
