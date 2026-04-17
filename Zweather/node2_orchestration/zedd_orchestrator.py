@@ -197,12 +197,22 @@ def inference_worker():
             # Convert to stable JSON string (sort_keys=True, no spaces)
             stable_json = json.dumps(attestation_payload, sort_keys=True, separators=(',', ':'))
             
-            # Generate SHA-256 signature
-            signature = hashlib.sha256(stable_json.encode('utf-8')).hexdigest()
-            attestation_payload["signature"] = signature
+            # Generate keyed BLAKE2b signature for attestation integrity
+            signing_key = os.getenv("ATTESTATION_HMAC_KEY", "")
+            if not signing_key:
+                logger.warning("ATTESTATION_HMAC_KEY not set; skipping attestation signing.")
+                attestation_payload["signature"] = None
+            else:
+                # BLAKE2b supports keys up to 64 bytes
+                key_bytes = signing_key.encode('utf-8')[:64]
+                signature = hashlib.blake2b(
+                    stable_json.encode('utf-8'),
+                    key=key_bytes,
+                    digest_size=32,
+                ).hexdigest()
+                attestation_payload["signature"] = signature
             
-            logger.info(f"Attestation generated successfully. Signature: {signature}")
-            logger.debug(f"Final Payload: {json.dumps(attestation_payload, indent=2)}")
+            logger.info("Attestation generated successfully.")
             
             # Signal task completion to the queue
             telemetry_queue.task_done()
