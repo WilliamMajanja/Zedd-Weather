@@ -179,7 +179,7 @@ class ZeddOrchestrator:
             signature = hmac.new(
                 signing_key.encode('utf-8'),
                 payload_str.encode('utf-8'),
-                hashlib.sha256,
+                hashlib.sha512,
             ).hexdigest()
 
         attestation_record = {

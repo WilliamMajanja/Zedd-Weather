@@ -198,7 +198,7 @@ def inference_worker():
             # Convert to stable JSON string (sort_keys=True, no spaces)
             stable_json = json.dumps(attestation_payload, sort_keys=True, separators=(',', ':'))
             
-            # Generate HMAC-SHA256 signature for attestation integrity
+            # Generate HMAC-SHA512 signature for attestation integrity
             signing_key = os.getenv("ATTESTATION_HMAC_KEY", "")
             if not signing_key:
                 logger.warning("ATTESTATION_HMAC_KEY not set; skipping attestation signing.")
@@ -207,7 +207,7 @@ def inference_worker():
                 signature = hmac.new(
                     signing_key.encode('utf-8'),
                     stable_json.encode('utf-8'),
-                    hashlib.sha256,
+                    hashlib.sha512,
                 ).hexdigest()
                 attestation_payload["signature"] = signature
             
