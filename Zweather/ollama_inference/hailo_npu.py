@@ -8,7 +8,6 @@ when the NPU is unavailable.
 The client loads a pre-compiled HEF (Hailo Executable Format) model at
 startup and keeps it resident on the NPU for low-latency inference.
 """
-import json
 import logging
 import os
 from typing import Optional
@@ -45,7 +44,6 @@ class HailoNPUClient:
             from hailo_platform import (  # type: ignore[import-untyped]
                 HEF,
                 HailoRTDevice,
-                ConfigureParams,
             )
 
             self._device = HailoRTDevice()

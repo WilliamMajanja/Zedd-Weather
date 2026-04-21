@@ -1,8 +1,5 @@
 """Tests for Zweather.app – buffer and anomaly detection (no hardware required)."""
-import os
 import sqlite3
-
-import pytest
 
 
 def test_sqlite_buffer_write_read(tmp_path):

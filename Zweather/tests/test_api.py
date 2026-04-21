@@ -1,5 +1,4 @@
 """Tests for the FastAPI REST API endpoints."""
-import pytest
 from fastapi.testclient import TestClient
 from Zweather.api import app
 

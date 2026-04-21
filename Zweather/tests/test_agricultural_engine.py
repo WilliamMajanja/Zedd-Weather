@@ -1,5 +1,4 @@
 """Tests for Zweather.agricultural.engine"""
-import pytest
 from Zweather.agricultural.engine import AgriculturalEngine
 from Zweather.agricultural.models import CROP_PROFILES, IrrigationSchedule, SoilMoisturePrediction
 
