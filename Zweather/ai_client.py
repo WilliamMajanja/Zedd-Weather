@@ -7,6 +7,7 @@ Ollama server for non-cloud deployments.
 import json
 import logging
 import os
+import asyncio
 from typing import Any
 
 import aiohttp
@@ -86,11 +87,17 @@ async def _generate_text(prompt: str) -> str:
         "options": {"temperature": 0.2},
     }
     url = f"{_ollama_base_url()}/api/generate"
-    async with aiohttp.ClientSession(timeout=_REQUEST_TIMEOUT) as session:
-        async with session.post(url, json=payload) as response:
-            response.raise_for_status()
-            data = await response.json()
-            return str(data.get("response", "")).strip()
+    try:
+        async with aiohttp.ClientSession(timeout=_REQUEST_TIMEOUT) as session:
+            async with session.post(url, json=payload) as response:
+                response.raise_for_status()
+                data = await response.json()
+                return str(data.get("response", "")).strip()
+    except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+        raise RuntimeError(
+            f"Local Ollama request failed at {url}. "
+            "Check OLLAMA_BASE_URL and that the Ollama server is running."
+        ) from exc
 
 
 async def analyze_risk(
@@ -201,7 +208,7 @@ async def generate_site_map(lat: float, lng: float) -> dict[str, Any]:
     )
     try:
         report = await _generate_text(prompt)
-    except aiohttp.ClientError as exc:
+    except RuntimeError as exc:
         logger.error("Local AI site-map generation failed: %s", exc)
         report = "Failed to generate local site logistics report."
     return {"report": report, "links": []}

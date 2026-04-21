@@ -178,6 +178,11 @@ Be specific and practical. Limit response to 250 words."""
             resp.raise_for_status()
             data = resp.json()
             return data.get("response", "").strip()
-        except Exception as exc:
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            requests.RequestException,
+        ) as exc:
             logger.error("Ollama generation failed: %s", exc)
             return f"Ollama error: {exc}"
