@@ -75,6 +75,47 @@ services:
       - open-webui-data:/app/backend/data
 
   # ---------------------------------------------------------------------------
+  # Zedd-Weather Dash Dashboard (Python frontend)
+  # ---------------------------------------------------------------------------
+  zedd-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zedd-dashboard
+    restart: unless-stopped
+    command: ["python", "-m", "Zweather.dashboard.app"]
+    ports:
+      - "8050:8050"
+    environment:
+      API_BASE_URL:  http://zedd-api:8000
+      DASH_PORT:     "8050"
+    depends_on:
+      - zedd-api
+
+  # ---------------------------------------------------------------------------
+  # Zedd-Weather FastAPI REST API
+  # ---------------------------------------------------------------------------
+  zedd-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zedd-api
+    restart: unless-stopped
+    command: ["uvicorn", "Zweather.api:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    environment:
+      GEMINI_API_KEY:         ${GEMINI_API_KEY:?Set GEMINI_API_KEY in .env}
+      GOOGLE_WEATHER_API_KEY: ${GOOGLE_WEATHER_API_KEY:-}
+      INFLUXDB_URL:    http://influxdb:8086
+      INFLUXDB_ORG:    ${DOCKER_INFLUXDB_INIT_ORG:-zedd-weather}
+      INFLUXDB_BUCKET: ${DOCKER_INFLUXDB_INIT_BUCKET:-telemetry}
+      INFLUXDB_TOKEN:  ${INFLUXDB_TOKEN:?Set INFLUXDB_TOKEN in .env}
+    depends_on:
+      influxdb:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
   # Zedd-Weather Edge Collector – sensor reader + InfluxDB writer
   # ---------------------------------------------------------------------------
   zedd-weather-edge:

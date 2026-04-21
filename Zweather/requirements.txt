@@ -1,5 +1,6 @@
 # Zedd Weather - Python Dependencies
-# Node 1 (Telemetry), Node 2 (Orchestration), and Edge InfluxDB Publisher
+# Node 1 (Telemetry), Node 2 (Orchestration), Edge InfluxDB Publisher,
+# FastAPI backend, and Dash Python frontend.
 
 # InfluxDB v2 time-series client (used by app.py / edge publisher)
 influxdb-client>=1.50.0,<2.0
@@ -35,6 +36,16 @@ python-dotenv>=1.0.0
 # REST API
 fastapi>=0.115.0
 uvicorn>=0.30.0
+
+# HTTP client (used by Dash frontend and OllamaClient)
+requests>=2.32.0
+
+# ---------------------------------------------------------------------------
+# Python Dash frontend
+# ---------------------------------------------------------------------------
+dash>=2.18.0
+plotly>=5.24.0
+dash-bootstrap-components>=1.6.0
 
 # Raspberry Pi AI HAT+ (Hailo-8L NPU)
 hailort>=4.18.0; platform_machine == "aarch64" or platform_machine == "armv7l"
