@@ -12,9 +12,20 @@ Tests for the new Python-frontend API endpoints added in the refactor:
 import pytest
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
-from Zweather.api import app, _latest_telemetry
+import Zweather.api as api_module
+from Zweather.api import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _clear_telemetry_store():
+    """Ensure the in-memory telemetry store is empty before every test."""
+    with api_module._telemetry_lock:
+        api_module._latest_telemetry.clear()
+    yield
+    with api_module._telemetry_lock:
+        api_module._latest_telemetry.clear()
 
 # ---------------------------------------------------------------------------
 # Sensor Telemetry Ingest / Latest
@@ -29,6 +40,13 @@ class TestTelemetryIngest:
         }
         base.update(kwargs)
         return base
+
+    def test_latest_returns_null_before_any_ingest(self):
+        resp = client.get("/api/telemetry/latest")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["telemetry"] is None
+        assert data["timestamp"] is None
 
     def test_ingest_returns_202(self):
         resp = client.post("/api/telemetry/ingest", json=self._payload())

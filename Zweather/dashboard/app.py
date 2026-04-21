@@ -1051,9 +1051,10 @@ def _fetch_map(
     label = f"📍 {loc['lat']:.4f}, {loc['lng']:.4f}"
 
     link_items = [
-        html.A(lnk.get("title") or lnk["uri"], href=lnk["uri"], target="_blank",
+        html.A(lnk.get("title") or lnk.get("uri", ""), href=lnk.get("uri", "#"), target="_blank",
                style={"display": "block", "color": C["indigo"], "fontSize": "12px", "marginBottom": "4px", "textDecoration": "none"})
         for lnk in links[:10]
+        if lnk.get("uri")
     ]
 
     return html.Div(

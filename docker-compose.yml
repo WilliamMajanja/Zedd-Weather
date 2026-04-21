@@ -89,8 +89,6 @@ services:
     environment:
       API_BASE_URL:  http://zedd-api:8000
       DASH_PORT:     "8050"
-      GEMINI_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in .env}
-      GOOGLE_WEATHER_API_KEY: ${GOOGLE_WEATHER_API_KEY:-}
     depends_on:
       - zedd-api
 

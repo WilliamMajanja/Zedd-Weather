@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 GOOGLE_WEATHER_BASE = "https://weather.googleapis.com/v1"
 _DEFAULT_AQI = 42
 _DEFAULT_TIDE = 1.2
-_KMH_TO_MS = 3.6
+_KMH_TO_MS_DIVISOR = 3.6  # divide km/h by this to get m/s
 
 
 def _api_key() -> str:
@@ -111,7 +111,7 @@ async def get_forecast(lat: float, lng: float, days: int = 7) -> list[dict[str, 
                     .get("probability", {})
                     .get("percent", 0.0)
                 ),
-                "wind": wind_kmh / _KMH_TO_MS,
+                "wind": wind_kmh / _KMH_TO_MS_DIVISOR,
                 "uv": daytime.get("uvIndex", 0.0),
             }
         )
