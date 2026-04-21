@@ -41,12 +41,14 @@ It runs as a **PiNet DApp** on a Raspberry Pi Weather Node cluster with real har
 
 ```text
 .
-├── src/                           # React 19 + TypeScript frontend (Vite)
+├── src/                           # React 19 + TypeScript frontend (Vite) — legacy
 │   ├── components/                #   Page components and shared UI
 │   ├── hooks/                     #   Custom React hooks (telemetry, alerts, forecast, …)
 │   ├── types/                     #   TypeScript type definitions
 │   └── lib/                       #   RAG pipeline, evaluation metrics, utilities
-├── Zweather/                      # Python backend services
+├── Zweather/                      # Python backend + Python Dash frontend
+│   ├── dashboard/                 #   ★ Python Dash frontend (replaces React)
+│   │   └── app.py                 #     Dash app: 4 tabs, Plotly charts, all callbacks
 │   ├── node1_telemetry/           #   Sensor drivers, MQTT publisher, config
 │   ├── node2_orchestration/       #   MQTT subscriber, AI inference, attestation
 │   ├── ollama_inference/          #   Gemini / Ollama / Hailo NPU inference clients
@@ -54,7 +56,9 @@ It runs as a **PiNet DApp** on a Raspberry Pi Weather Node cluster with real har
 │   ├── agricultural/              #   Agricultural sector risk engine (+ forecasting)
 │   ├── industrial/                #   Industrial sector risk engine
 │   ├── alerting/                  #   Rule-based alert engine + notification channels
-│   ├── api.py                     #   FastAPI REST API
+│   ├── weather_client.py          #   ★ Server-side Google Weather API async client
+│   ├── ai_client.py               #   ★ Server-side Gemini AI client (risk, forecast, map)
+│   ├── api.py                     #   FastAPI REST API (extended with weather/AI/telemetry endpoints)
 │   ├── app.py                     #   Edge collector entry point
 │   └── tests/                     #   Pytest test suite
 ├── docker-compose.yml             # Core local stack (control plane + storage)
@@ -64,6 +68,30 @@ It runs as a **PiNet DApp** on a Raspberry Pi Weather Node cluster with real har
 ├── public/                        # Static assets incl. PiNet DApp manifest
 └── .github/workflows/             # CI workflows (lint, test, build, CodeQL)
 ```
+
+## Python Frontend + Backend Architecture
+
+The application now runs as a **fully Python stack**:
+
+```
+Sensors (Sense HAT / Enviro+ / Modbus)
+    │  MQTT
+    ▼
+Node1 telemetry publisher  →  POST /api/telemetry/ingest  →  FastAPI (port 8000)
+                                                                    │
+Google Weather API  ←── GET /api/weather/{current,forecast,history} ┤
+Gemini AI           ←── POST /api/ai/{risk,forecast,sitemap}        │
+                                                                    │
+                                      Dash frontend (port 8050) ◄──┘
+                                           │ browser
+                                         User
+```
+
+**Key benefits:**
+- All API keys (`GEMINI_API_KEY`, `GOOGLE_WEATHER_API_KEY`) stay server-side — never sent to the browser
+- Sensor nodes push readings to `/api/telemetry/ingest` over HTTP; the Dash UI polls `/api/telemetry/latest`
+- Pure Python stack: easier deployment on Raspberry Pi, no Node.js required for the frontend
+- Plotly charts in Dash provide equivalent visualisation to the React/Recharts UI
 
 ## Quick Start (Local)
 
@@ -110,7 +138,38 @@ Use `--build` only after local code or Dockerfile changes:
 docker compose -f docker-compose.yml -f docker-compose.cluster.yml up -d --build
 ```
 
-### 5) Frontend development
+### 5) Python dashboard (recommended) and legacy React frontend
+
+**Python Dash dashboard** (no Node.js required):
+
+```bash
+pip install -r Zweather/requirements.txt
+
+# Terminal 1 – FastAPI backend (weather proxy + AI endpoints)
+uvicorn Zweather.api:app --host 0.0.0.0 --port 8000
+
+# Terminal 2 – Dash frontend
+python -m Zweather.dashboard.app
+```
+
+The Dash dashboard runs on **http://localhost:8050**.
+
+Set these environment variables before starting:
+```
+GOOGLE_WEATHER_API_KEY=...   # Google Weather API key (server-side)
+GEMINI_API_KEY=...           # Gemini API key (server-side)
+API_BASE_URL=http://localhost:8000
+```
+
+**Push sensor data** from any Node 1 sensor directly to the API:
+
+```bash
+curl -X POST http://localhost:8000/api/telemetry/ingest \
+  -H 'Content-Type: application/json' \
+  -d '{"temperature": 25.3, "humidity": 58.0, "pressure": 1013.0, "node_id": "pi-node-c"}'
+```
+
+**Legacy React frontend** (requires Node.js 20+):
 
 ```bash
 npm install
@@ -200,11 +259,36 @@ The GitHub Actions workflows run:
 
 The FastAPI backend (`Zweather/api.py`) exposes these endpoints:
 
+### Core endpoints (heuristic engines)
+
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/health` | Service health check |
 | `POST` | `/api/analyze` | Run sector-specific risk analysis on telemetry data |
 | `POST` | `/api/alerts` | Evaluate alert rules against telemetry data |
+
+### Sensor telemetry (Python frontend / sensor nodes)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/telemetry/ingest` | Accept a sensor reading (Sense HAT, Enviro+, Modbus, etc.) |
+| `GET` | `/api/telemetry/latest` | Return the most recent ingested sensor snapshot |
+
+### Google Weather API proxy (server-side key)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/weather/current?lat=…&lng=…` | Current conditions + today's hourly forecast |
+| `GET` | `/api/weather/forecast?lat=…&lng=…&days=7` | Multi-day daily forecast |
+| `GET` | `/api/weather/history?lat=…&lng=…&days=7` | Historical hourly data |
+
+### Gemini AI (server-side key)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/api/ai/risk` | AI risk analysis on live telemetry for a sector |
+| `POST` | `/api/ai/forecast` | AI risk analysis on a 7-day forecast |
+| `POST` | `/api/ai/sitemap` | Site logistics report via Gemini + Google Maps |
 
 Start the API server locally:
 
