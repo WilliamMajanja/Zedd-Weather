@@ -1,6 +1,5 @@
 import os
 import json
-import time
 import queue
 import logging
 import hashlib

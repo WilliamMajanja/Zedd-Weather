@@ -207,7 +207,7 @@ class ZeddOrchestrator:
                     directive = self.run_inference(self.latest_telemetry, macro_data)
                     
                     if directive:
-                        attestation = self.attest_directive(directive)
+                        self.attest_directive(directive)
                         # Store or broadcast attestation
                         
                 await asyncio.sleep(60) # Run orchestration cycle every 60s

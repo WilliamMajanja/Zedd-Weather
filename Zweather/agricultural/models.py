@@ -4,7 +4,6 @@ Crop profiles with optimal growing conditions, stress thresholds, and growth sta
 """
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class GrowthStage(Enum):

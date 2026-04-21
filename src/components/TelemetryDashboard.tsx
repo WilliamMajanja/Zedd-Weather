@@ -34,7 +34,6 @@ import {
 import type { TelemetryData, HourlyWeatherPoint, HistoricalDataPoint, Attestation, NodeInfo, ExportMetrics } from '../types/telemetry';
 import { MetricCard } from './ui/MetricCard';
 import { Modal } from './ui/Modal';
-import { SkeletonCard, SkeletonChart } from './ui/LoadingFallback';
 
 interface TelemetryDashboardProps {
   currentTelemetry: TelemetryData;

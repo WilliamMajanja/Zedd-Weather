@@ -3,7 +3,7 @@ Alert rules engine for Zedd Weather.
 Evaluates telemetry against configurable thresholds and generates alerts.
 """
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional

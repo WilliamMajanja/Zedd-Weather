@@ -2,13 +2,9 @@
 Agricultural intelligence engine for Zedd Weather.
 Heuristic-based analysis of telemetry data to produce crop recommendations.
 """
-import math
-from typing import Optional
-
 from .models import (
     CropProfile,
     CROP_PROFILES,
-    GrowthStage,
     IrrigationSchedule,
     SoilMoisturePrediction,
 )
@@ -125,7 +121,6 @@ class AgriculturalEngine:
         estimated_vwc = max(5.0, min(55.0, baseline_vwc + humidity_contrib + rain_contrib - et_loss))
 
         # Days to irrigation: assume crop needs irrigation below ~20 % VWC
-        deficit = max(0.0, 20.0 - estimated_vwc)
         daily_depletion = max(0.1, et_daily - rainfall_mm * 0.3)
         days_to_irr = int(max(0, (estimated_vwc - 20.0) / daily_depletion)) if estimated_vwc > 20.0 else 0
 

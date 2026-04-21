@@ -1,5 +1,4 @@
 """Tests for Zweather.construction.engine"""
-import pytest
 from Zweather.construction.engine import ConstructionEngine
 from Zweather.construction.models import (
     ACTIVITY_PROFILES,

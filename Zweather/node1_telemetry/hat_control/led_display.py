@@ -10,8 +10,6 @@ Provides high-level routines to visualise system and alert state on the
 """
 import logging
 
-from Zweather.node1_telemetry import config
-
 logger = logging.getLogger(__name__)
 
 # Colour constants [R, G, B]

@@ -1,5 +1,4 @@
 """Tests for Zweather.agricultural.forecasting"""
-import pytest
 from Zweather.agricultural.forecasting import WeatherForecaster
 
 

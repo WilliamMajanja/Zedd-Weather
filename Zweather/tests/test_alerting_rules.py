@@ -1,7 +1,5 @@
 """Tests for Zweather.alerting.rules"""
-import pytest
-from datetime import datetime, timezone
-from Zweather.alerting.rules import AlertRulesEngine, Alert, AlertRule, AlertSeverity
+from Zweather.alerting.rules import AlertRulesEngine, AlertRule, AlertSeverity
 
 
 class TestAlertRulesEngine:

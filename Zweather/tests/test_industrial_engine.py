@@ -1,5 +1,4 @@
 """Tests for Zweather.industrial.engine"""
-import pytest
 from Zweather.industrial.engine import IndustrialEngine
 from Zweather.industrial.models import (
     FACILITY_PROFILES,

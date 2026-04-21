@@ -3,9 +3,7 @@ Weather pattern analysis and trend detection for Zedd Weather.
 Provides rolling statistics, trend analysis, and anomaly detection
 from a time-series of telemetry readings.
 """
-import math
 import statistics
-from typing import Optional
 
 
 class WeatherForecaster:
@@ -61,7 +59,7 @@ class WeatherForecaster:
 
         storm_prob = self._storm_probability(pressures, humids, temps)
 
-        def trend_label(slope: float, unit: str) -> str:
+        def trend_label(slope: float) -> str:
             if abs(slope) < 0.01:
                 return "stable"
             direction = "rising" if slope > 0 else "falling"
@@ -69,11 +67,11 @@ class WeatherForecaster:
             return f"{magnitude} {direction}"
 
         return {
-            "temperature_trend": trend_label(temp_trend, "°C"),
+            "temperature_trend": trend_label(temp_trend),
             "temperature_slope_per_reading": round(temp_trend, 4),
-            "humidity_trend": trend_label(humidity_trend, "%"),
+            "humidity_trend": trend_label(humidity_trend),
             "humidity_slope_per_reading": round(humidity_trend, 4),
-            "pressure_trend": trend_label(pressure_trend, "hPa"),
+            "pressure_trend": trend_label(pressure_trend),
             "pressure_slope_per_reading": round(pressure_trend, 4),
             "storm_probability": round(storm_prob, 2),
             "summary": self._trend_summary(temp_trend, humidity_trend, pressure_trend, storm_prob),
