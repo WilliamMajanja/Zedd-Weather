@@ -5,8 +5,9 @@ Initialises every enabled sensor driver, collects their readings into a
 single ``dict``, and provides a clean shutdown path.
 
 Hardware profile (production Raspberry Pi Weather Node):
-    - Sense HAT v2   – environmental + IMU sensors, 8×8 LED matrix
+    - BCRobotics Weather HAT PRO – primary environmental + wind/rain station
     - AI HAT+ (Hailo-8L NPU via M.2 Key E) – on-device edge inference
+    - Sense HAT v2 (optional) – IMU + 8×8 LED matrix
     - GPIO / I2C / Modbus peripherals
 """
 import time
@@ -18,7 +19,7 @@ from Zweather.node1_telemetry.sensors.ai_hat_driver import AIHatDriver
 from Zweather.node1_telemetry.sensors.gpio_sensors import RainGaugeSensor
 from Zweather.node1_telemetry.sensors.uv_sensor import UVSensor
 from Zweather.node1_telemetry.sensors.enviro_plus import EnviroPlusSensor
-from Zweather.node1_telemetry.sensors.weather_hat import WeatherHatSensor
+from Zweather.node1_telemetry.sensors.weather_hat_pro import WeatherHatProDriver
 from Zweather.node1_telemetry.sensors.modbus_sensors import ModbusSensors
 
 logger = logging.getLogger(__name__)
@@ -63,9 +64,9 @@ class SensorManager:
         enviro.initialize()
         self._drivers.append(enviro)
 
-        weather_hat = WeatherHatSensor()
-        weather_hat.initialize()
-        self._drivers.append(weather_hat)
+        weather_hat_pro = WeatherHatProDriver()
+        weather_hat_pro.initialize()
+        self._drivers.append(weather_hat_pro)
 
         modbus = ModbusSensors()
         modbus.initialize()
@@ -74,7 +75,7 @@ class SensorManager:
         active = [d.name for d in self._drivers if d.available]
         logger.info(
             "Sensor manager ready — %d driver(s) active: %s",
-            len(active), ", ".join(active) or "(mock only)",
+            len(active), ", ".join(active) or "(none — no real hardware detected)",
         )
 
     # ------------------------------------------------------------------

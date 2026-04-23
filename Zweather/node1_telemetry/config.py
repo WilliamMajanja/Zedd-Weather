@@ -3,9 +3,16 @@ Centralized configuration for the Node 1 telemetry system.
 All hardware pins, MQTT settings, thresholds, and sensor toggles live here.
 
 Hardware profile (production Raspberry Pi Weather Node):
-    - Sense HAT v2   – environmental + IMU sensors, 8×8 LED matrix
+    - BCRobotics Weather HAT PRO – primary environmental + wind/rain
+        station (BME280 over I²C, anemometer, wind vane, tipping-bucket
+        rain gauge wired through the three RJ12 jacks)
     - AI HAT+ (Hailo-8L NPU via M.2 Key E) – on-device edge inference
     - M.2 NVMe SSD   – fast local telemetry buffer and model storage
+
+The legacy Sense HAT v2 is still supported as an optional secondary HAT
+(``SENSE_HAT_ENABLED=true``) for sites that need an IMU or the 8×8 LED
+matrix, but it is **disabled by default** in favour of the Weather HAT
+PRO.
 """
 import os
 
@@ -19,9 +26,9 @@ MQTT_CLIENT_ID = "node1_telemetry"
 PUBLISH_INTERVAL = float(os.getenv("PUBLISH_INTERVAL", "5.0"))  # seconds
 
 # ---------------------------------------------------------------------------
-# Sense HAT
+# Sense HAT (legacy / optional secondary HAT — disabled by default)
 # ---------------------------------------------------------------------------
-SENSE_HAT_ENABLED = os.getenv("SENSE_HAT_ENABLED", "true").lower() == "true"
+SENSE_HAT_ENABLED = os.getenv("SENSE_HAT_ENABLED", "false").lower() == "true"
 # CPU temperature compensation factor (Sense HAT reads ~2 °C high due to
 # proximity to the Pi CPU).  Subtract this from the raw reading.
 SENSE_HAT_TEMP_OFFSET = float(os.getenv("SENSE_HAT_TEMP_OFFSET", "2.0"))
@@ -73,17 +80,36 @@ UV_SENSOR_I2C_ADDR = int(os.getenv("UV_SENSOR_I2C_ADDR", "0x10"), 0)
 ENVIRO_PLUS_ENABLED = os.getenv("ENVIRO_PLUS_ENABLED", "false").lower() == "true"
 
 # ---------------------------------------------------------------------------
-# Pimoroni Weather HAT (BME280 + LTR559 + wind/rain + 1.54" LCD)
+# BCRobotics Weather HAT PRO (BME280 + reed-switch anemometer + wind vane
+# + tipping-bucket rain gauge, wired through the three RJ12 jacks).
+# Primary sensor HAT for the Zedd sensory worker — enabled by default.
 # ---------------------------------------------------------------------------
-WEATHER_HAT_ENABLED = os.getenv("WEATHER_HAT_ENABLED", "false").lower() == "true"
-# CPU temperature compensation factor for the BME280 on the Weather HAT
-# (the board sits close to the Pi CPU).  Pimoroni's reference example uses 0.8.
-WEATHER_HAT_TEMP_OFFSET = float(os.getenv("WEATHER_HAT_TEMP_OFFSET", "0.8"))
-# Integration window (seconds) used when calling WeatherHAT.update() — wind
-# speed and rainfall are accumulated over this window.  Typically matches
-# PUBLISH_INTERVAL.
-WEATHER_HAT_UPDATE_INTERVAL = float(
-    os.getenv("WEATHER_HAT_UPDATE_INTERVAL", str(PUBLISH_INTERVAL))
+WEATHER_HAT_PRO_ENABLED = (
+    os.getenv("WEATHER_HAT_PRO_ENABLED", "true").lower() == "true"
+)
+# CPU temperature compensation factor for the on-board BME280
+# (the board sits close to the Pi CPU).  0.8 °C is a sensible default.
+WEATHER_HAT_PRO_TEMP_OFFSET = float(
+    os.getenv("WEATHER_HAT_PRO_TEMP_OFFSET", "0.8")
+)
+# I²C bus the BME280 lives on (bus 1 on every modern Pi).
+WEATHER_HAT_PRO_I2C_BUS = int(os.getenv("WEATHER_HAT_PRO_I2C_BUS", "1"))
+# GPIO (BCM numbering) connected to the anemometer reed switch (RJ12 J2).
+WEATHER_HAT_PRO_ANEMOMETER_GPIO_PIN = int(
+    os.getenv("WEATHER_HAT_PRO_ANEMOMETER_GPIO_PIN", "5")
+)
+# GPIO (BCM numbering) connected to the rain-gauge reed switch (RJ12 J3).
+WEATHER_HAT_PRO_RAIN_GAUGE_GPIO_PIN = int(
+    os.getenv("WEATHER_HAT_PRO_RAIN_GAUGE_GPIO_PIN", "6")
+)
+# Each rain-gauge bucket tip = 0.2794 mm of rainfall (SparkFun /
+# Argent Data Systems standard tipping-bucket gauge).
+WEATHER_HAT_PRO_RAIN_MM_PER_TIP = float(
+    os.getenv("WEATHER_HAT_PRO_RAIN_MM_PER_TIP", "0.2794")
+)
+# MCP3008 / ADS1015 channel the wind-vane resistor divider is wired to.
+WEATHER_HAT_PRO_VANE_ADC_CHANNEL = int(
+    os.getenv("WEATHER_HAT_PRO_VANE_ADC_CHANNEL", "0")
 )
 
 # ---------------------------------------------------------------------------

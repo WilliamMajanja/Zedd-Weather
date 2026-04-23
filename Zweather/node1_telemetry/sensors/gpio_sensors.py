@@ -11,7 +11,6 @@ per-interval rainfall rate that resets on every ``read()`` call.
 """
 import time
 import threading
-import random
 import logging
 
 from Zweather.node1_telemetry.sensors.base import BaseSensor
@@ -53,7 +52,10 @@ class RainGaugeSensor(BaseSensor):
                 "Rain gauge initialised on GPIO %d.", config.RAIN_GAUGE_GPIO_PIN
             )
         except (ImportError, RuntimeError) as exc:
-            logger.warning("Rain gauge GPIO unavailable (%s). Using mock data.", exc)
+            logger.warning(
+                "Rain gauge GPIO unavailable (%s). No rain gauge readings "
+                "will be emitted.", exc,
+            )
             self._available = False
 
     def _on_tip(self, _channel: int) -> None:
@@ -68,8 +70,6 @@ class RainGaugeSensor(BaseSensor):
     def read(self) -> dict:
         if self._available:
             return self._read_hardware()
-        if config.RAIN_GAUGE_ENABLED:
-            return self._read_mock()
         return {}
 
     def _read_hardware(self) -> dict:
@@ -89,14 +89,6 @@ class RainGaugeSensor(BaseSensor):
             "rain_total_mm": round(
                 self._total_tips * config.RAIN_GAUGE_MM_PER_TIP, 4
             ),
-        }
-
-    @staticmethod
-    def _read_mock() -> dict:
-        return {
-            "rain_interval_mm": round(random.uniform(0, 0.6), 4),
-            "rain_rate_mm_h": round(random.uniform(0, 5.0), 2),
-            "rain_total_mm": round(random.uniform(0, 25.0), 4),
         }
 
     # ------------------------------------------------------------------

@@ -22,8 +22,9 @@ class TestAIHatDriver:
             driver.initialize()
             assert driver.read() == {}
 
-    def test_mock_mode_returns_expected_keys(self):
-        """When hailo_platform is absent, enabled driver returns mock data."""
+    def test_unavailable_status_when_runtime_absent(self):
+        """When hailo_platform is absent, an enabled driver reports an
+        explicit unavailable status (not synthetic telemetry)."""
         with patch.dict(os.environ, {"AI_HAT_ENABLED": "true"}):
             import importlib
             import Zweather.node1_telemetry.config as cfg
@@ -38,7 +39,8 @@ class TestAIHatDriver:
             assert "ai_hat_status" in data
             assert "npu_temp_c" in data
             assert "npu_power_w" in data
-            assert data["ai_hat_status"] == "standby"
+            assert data["ai_hat_available"] is False
+            assert data["ai_hat_status"] == "unavailable"
 
     def test_cleanup_no_error_when_unavailable(self):
         """cleanup() should not raise even when no hardware is present."""

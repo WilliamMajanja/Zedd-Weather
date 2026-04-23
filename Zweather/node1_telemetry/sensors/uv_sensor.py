@@ -11,7 +11,6 @@ Register map (subset):
     0x0A  UVCOMP1   – visible compensation channel 1
     0x0B  UVCOMP2   – IR compensation channel 2
 """
-import random
 import logging
 
 from Zweather.node1_telemetry.sensors.base import BaseSensor
@@ -61,7 +60,10 @@ class UVSensor(BaseSensor):
                 config.UV_SENSOR_I2C_BUS, config.UV_SENSOR_I2C_ADDR,
             )
         except (ImportError, OSError) as exc:
-            logger.warning("VEML6075 unavailable (%s). Using mock data.", exc)
+            logger.warning(
+                "VEML6075 unavailable (%s). No UV readings will be emitted.",
+                exc,
+            )
             self._available = False
 
     # ------------------------------------------------------------------
@@ -76,8 +78,6 @@ class UVSensor(BaseSensor):
     def read(self) -> dict:
         if self._available:
             return self._read_hardware()
-        if config.UV_SENSOR_ENABLED:
-            return self._read_mock()
         return {}
 
     def _read_hardware(self) -> dict:
@@ -97,14 +97,6 @@ class UVSensor(BaseSensor):
             "uv_index": uv_index,
             "uva_raw": raw_uva,
             "uvb_raw": raw_uvb,
-        }
-
-    @staticmethod
-    def _read_mock() -> dict:
-        return {
-            "uv_index": round(random.uniform(0, 11.0), 2),
-            "uva_raw": random.randint(0, 3000),
-            "uvb_raw": random.randint(0, 3000),
         }
 
     # ------------------------------------------------------------------

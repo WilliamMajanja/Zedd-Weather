@@ -8,9 +8,10 @@ Exposes readings from:
     - PMS5003  — particulate matter (PM1.0, PM2.5, PM10)
 
 All sub-sensors degrade gracefully: if one component fails to initialise the
-driver still returns data from the remaining components.
+driver still returns data from the remaining components.  When **no**
+sub-sensor is available the driver emits an empty payload — it never
+synthesises fake readings.
 """
-import random
 import logging
 
 from Zweather.node1_telemetry.sensors.base import BaseSensor
@@ -81,7 +82,10 @@ class EnviroPlusSensor(BaseSensor):
 
         self._available = any_ok
         if not any_ok:
-            logger.warning("No Enviro+ sub-sensors available. Using mock data.")
+            logger.warning(
+                "No Enviro+ sub-sensors available. No Enviro+ readings will "
+                "be emitted."
+            )
 
     # ------------------------------------------------------------------
     # Reading
@@ -89,8 +93,6 @@ class EnviroPlusSensor(BaseSensor):
     def read(self) -> dict:
         if self._available:
             return self._read_hardware()
-        if config.ENVIRO_PLUS_ENABLED:
-            return self._read_mock()
         return {}
 
     def _read_hardware(self) -> dict:
@@ -130,22 +132,6 @@ class EnviroPlusSensor(BaseSensor):
                 logger.error("PMS5003 read error: %s", exc)
 
         return data
-
-    @staticmethod
-    def _read_mock() -> dict:
-        return {
-            "enviro_temp_c": round(random.uniform(18.0, 32.0), 2),
-            "enviro_pressure_hpa": round(random.uniform(1005.0, 1020.0), 2),
-            "enviro_humidity_pct": round(random.uniform(30.0, 70.0), 2),
-            "light_lux": round(random.uniform(0, 80000), 2),
-            "proximity": random.randint(0, 1500),
-            "gas_reducing_kohm": round(random.uniform(50, 500), 2),
-            "gas_oxidising_kohm": round(random.uniform(5, 50), 2),
-            "gas_nh3_kohm": round(random.uniform(10, 300), 2),
-            "pm1_0_ug_m3": random.randint(0, 50),
-            "pm2_5_ug_m3": random.randint(0, 100),
-            "pm10_ug_m3": random.randint(0, 150),
-        }
 
     # ------------------------------------------------------------------
     # Cleanup
