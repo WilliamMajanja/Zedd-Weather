@@ -22,8 +22,10 @@ class BaseSensor(ABC):
     def initialize(self) -> None:
         """Perform one-time hardware initialisation.
 
-        Implementations should set ``self._available = True`` on success
-        and fall back to mock mode on failure (logging a warning).
+        Implementations should set ``self._available = True`` on success.
+        On failure they must log a warning and leave ``self._available``
+        as ``False``; ``read()`` must then emit no readings (return an
+        empty dict).  Sensor drivers must never synthesise fake data.
         """
 
     @abstractmethod

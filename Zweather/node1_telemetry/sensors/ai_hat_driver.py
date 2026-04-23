@@ -6,8 +6,10 @@ processing unit connected via the M.2 Key E slot on the AI HAT+.
 
 When available the NPU runs a lightweight weather-classification model
 locally, eliminating the need for cloud round-trips.  If the Hailo runtime
-is not installed (e.g. CI / non-Pi hosts) the driver falls back to a
-deterministic mock that returns a ``"simulation"`` label.
+is not installed (e.g. CI / non-Pi hosts) the driver simply reports
+``ai_hat_available=False`` and ``ai_hat_status="unavailable"`` so the rest
+of the pipeline can route around the missing accelerator — it never
+synthesises fake inference results.
 
 Telemetry keys emitted
 -----------------------
@@ -52,7 +54,8 @@ class AIHatDriver(BaseSensor):
             )
         except (ImportError, OSError, RuntimeError) as exc:
             logger.warning(
-                "Hailo NPU unavailable (%s). AI HAT running in mock mode.",
+                "Hailo NPU unavailable (%s). AI HAT will report "
+                "ai_hat_available=False.",
                 exc,
             )
             self._available = False
@@ -64,7 +67,7 @@ class AIHatDriver(BaseSensor):
         if self._available:
             return self._read_hardware()
         if config.AI_HAT_ENABLED:
-            return self._read_mock()
+            return self._read_unavailable_status()
         return {}
 
     def _read_hardware(self) -> dict:
@@ -91,10 +94,15 @@ class AIHatDriver(BaseSensor):
         }
 
     @staticmethod
-    def _read_mock() -> dict:
+    def _read_unavailable_status() -> dict:
+        """Status payload reported when the Hailo runtime is not present.
+
+        These are not synthetic readings — they explicitly tell consumers
+        the NPU is offline so they can skip on-device inference.
+        """
         return {
             "ai_hat_available": False,
-            "ai_hat_status": "standby",
+            "ai_hat_status": "unavailable",
             "npu_temp_c": 0.0,
             "npu_power_w": 0.0,
             "npu_utilization_pct": 0.0,

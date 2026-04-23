@@ -1,8 +1,8 @@
 {
   "id": "com.zedd.weather",
   "name": "Zedd Weather",
-  "description": "Raspberry Pi Weather Node edge DApp — Sense HAT environmental telemetry, Hailo-8L NPU on-device inference, and M.2 NVMe buffering on the PiNet cluster.",
-  "version": "1.1.0",
+  "description": "Raspberry Pi Weather Node edge DApp — BCRobotics Weather HAT PRO environmental + wind/rain telemetry, Hailo-8L NPU on-device inference, and M.2 NVMe buffering on the PiNet cluster.",
+  "version": "1.2.0",
   "author": "WilliamMajanja",
   "kind": "python",
   "entryPoint": "Zweather/dashboard/app.py",
@@ -18,7 +18,8 @@
     "hardware.npu"
   ],
   "hardware": {
-    "senseHat": true,
+    "weatherHatPro": true,
+    "senseHat": false,
     "aiHat": true,
     "m2Nvme": true
   },

@@ -12,7 +12,6 @@ Standard Modbus-RTU register layout assumed:
     Rain gauge  – unit ``config.MODBUS_RAIN_GAUGE_UNIT_ID``
         Register 0x0000: cumulative rainfall × 10 (0.1 mm resolution)
 """
-import random
 import logging
 
 from Zweather.node1_telemetry.sensors.base import BaseSensor
@@ -56,7 +55,10 @@ class ModbusSensors(BaseSensor):
             else:
                 logger.warning("Modbus client failed to connect on %s.", config.MODBUS_PORT)
         except (ImportError, OSError) as exc:
-            logger.warning("Modbus unavailable (%s). Using mock data.", exc)
+            logger.warning(
+                "Modbus unavailable (%s). No Modbus readings will be emitted.",
+                exc,
+            )
             self._available = False
 
     # ------------------------------------------------------------------
@@ -65,8 +67,6 @@ class ModbusSensors(BaseSensor):
     def read(self) -> dict:
         if self._available:
             return self._read_hardware()
-        if config.MODBUS_ENABLED:
-            return self._read_mock()
         return {}
 
     def _read_hardware(self) -> dict:
@@ -102,14 +102,6 @@ class ModbusSensors(BaseSensor):
             logger.error("Rain gauge read failed: %s", exc)
 
         return data
-
-    @staticmethod
-    def _read_mock() -> dict:
-        return {
-            "wind_speed_ms": round(random.uniform(0, 25.0), 1),
-            "wind_direction_deg": random.randint(0, 359),
-            "modbus_rain_total_mm": round(random.uniform(0, 50.0), 1),
-        }
 
     # ------------------------------------------------------------------
     # Cleanup

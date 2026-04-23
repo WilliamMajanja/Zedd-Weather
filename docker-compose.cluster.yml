@@ -20,7 +20,9 @@ services:
       MQTT_BROKER_HOST: ${MQTT_BROKER_HOST:-mqtt-broker}
       MQTT_BROKER_PORT: ${MQTT_BROKER_PORT:-1883}
       MQTT_TOPIC: ${MQTT_TOPIC:-weather_station/telemetry}
-      SENSE_HAT_ENABLED: "${SENSE_HAT_ENABLED:-true}"
+      WEATHER_HAT_PRO_ENABLED: "${WEATHER_HAT_PRO_ENABLED:-true}"
+      WEATHER_HAT_PRO_TEMP_OFFSET: "${WEATHER_HAT_PRO_TEMP_OFFSET:-0.8}"
+      SENSE_HAT_ENABLED: "${SENSE_HAT_ENABLED:-false}"
       AI_HAT_ENABLED: "${AI_HAT_ENABLED:-true}"
       AI_HAT_MODEL_PATH: "${AI_HAT_MODEL_PATH:-/opt/zedd/models/weather_classify.hef}"
       M2_NVME_ENABLED: "${M2_NVME_ENABLED:-false}"

@@ -9,8 +9,11 @@ Exposes:
 
 CPU-proximity temperature compensation is applied automatically using the
 offset value from ``config.SENSE_HAT_TEMP_OFFSET``.
+
+When the Sense HAT hardware (or its Python library) is not available the
+driver does **not** emit any synthetic data — ``read()`` simply returns
+an empty dict and downstream consumers receive no Sense HAT keys.
 """
-import random
 import logging
 
 from Zweather.node1_telemetry.sensors.base import BaseSensor
@@ -36,17 +39,21 @@ class SenseHatDriver(BaseSensor):
             self._available = True
             logger.info("Sense HAT initialised successfully.")
         except (ImportError, OSError) as exc:
-            logger.warning("Sense HAT unavailable (%s). Using mock data.", exc)
+            logger.warning(
+                "Sense HAT unavailable (%s). No Sense HAT readings will be "
+                "emitted.", exc,
+            )
             self._available = False
 
     # ------------------------------------------------------------------
     # Reading
     # ------------------------------------------------------------------
     def read(self) -> dict:
-        """Return a full snapshot of Sense HAT sensor data."""
+        """Return a full snapshot of Sense HAT sensor data, or an empty
+        dict when the hardware is unavailable."""
         if self._available:
             return self._read_hardware()
-        return self._read_mock()
+        return {}
 
     def _read_hardware(self) -> dict:
         raw_temp = self._sense.get_temperature()
@@ -81,18 +88,6 @@ class SenseHatDriver(BaseSensor):
                 "y": round(mag.get("y", 0), 4),
                 "z": round(mag.get("z", 0), 4),
             },
-        }
-
-    @staticmethod
-    def _read_mock() -> dict:
-        return {
-            "temperature_c": round(random.uniform(18.0, 30.0), 2),
-            "pressure_hpa": round(random.uniform(1005.0, 1020.0), 2),
-            "humidity_pct": round(random.uniform(30.0, 70.0), 2),
-            "orientation": {"pitch": 0.0, "roll": 0.0, "yaw": 0.0},
-            "accelerometer": {"x": 0.0, "y": 0.0, "z": 1.0},
-            "gyroscope": {"x": 0.0, "y": 0.0, "z": 0.0},
-            "magnetometer": {"x": 20.0, "y": -5.0, "z": -40.0},
         }
 
     # ------------------------------------------------------------------

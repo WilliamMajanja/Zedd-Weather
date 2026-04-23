@@ -13,6 +13,10 @@ Responsibilities:
   5. Touch /tmp/zedd-alive after every successful cycle so container
      health checks can detect hangs.
 
+This collector requires a real Sense HAT — it does **not** ship a
+simulated sensor and will exit with an error if the hardware (or the
+``sense_hat`` Python library) is not present.
+
 Environment variables (all optional – sensible defaults provided):
   INFLUXDB_URL            InfluxDB base URL              (default: http://localhost:8086)
   INFLUXDB_TOKEN          InfluxDB API token             (default: "")
@@ -228,8 +232,9 @@ class SenseHatReader:
     def __init__(self, temp_offset: float = 2.0) -> None:
         if not _SENSE_HAT_AVAILABLE:
             raise RuntimeError(
-                "sense_hat package is not installed. "
-                "Set SENSE_HAT_ENABLED=false to use the simulator instead."
+                "sense_hat package is not installed. Install it on the "
+                "edge node (e.g. `apt install sense-hat`) — this collector "
+                "requires real hardware and does not provide a simulator."
             )
         self._hat = SenseHat()
         self._hat.set_imu_config(False, False, False)  # disable IMU to save power
@@ -247,31 +252,6 @@ class SenseHatReader:
             pressure_hpa  = round(pressure, 2),
         )
 
-
-class SimulatedReader:
-    """
-    Deterministic fake sensor for development / CI environments without
-    physical hardware.  Values slowly oscillate around typical conditions.
-    """
-
-    def __init__(self) -> None:
-        log.warning(
-            "SENSE_HAT_ENABLED is false or hardware unavailable – "
-            "using simulated sensor data."
-        )
-        self._t = 0
-
-    def read(self) -> TelemetryReading:
-        self._t += 1
-        temp     = 20.0 + 5.0 * math.sin(self._t / 10.0)
-        humidity = 55.0 + 10.0 * math.cos(self._t / 15.0)
-        pressure = 1013.25 + 3.0 * math.sin(self._t / 20.0)
-        return TelemetryReading(
-            timestamp     = datetime.now(tz=timezone.utc),
-            temperature_c = round(temp,     2),
-            humidity_pct  = round(humidity, 2),
-            pressure_hpa  = round(pressure, 2),
-        )
 
 # ---------------------------------------------------------------------------
 # Validation & anomaly detection
@@ -435,10 +415,19 @@ def run() -> None:
     )
 
     # --- Initialise sensor ---
-    if SENSE_HAT_ENABLED and _SENSE_HAT_AVAILABLE:
-        reader: SenseHatReader | SimulatedReader = SenseHatReader(TEMP_OFFSET)
-    else:
-        reader = SimulatedReader()
+    if not SENSE_HAT_ENABLED:
+        log.error(
+            "SENSE_HAT_ENABLED is false but the edge collector requires "
+            "real Sense HAT hardware (no simulator is provided). Exiting."
+        )
+        sys.exit(1)
+    if not _SENSE_HAT_AVAILABLE:
+        log.error(
+            "sense_hat package is not installed. Install it on the edge "
+            "node to run the collector. Exiting."
+        )
+        sys.exit(1)
+    reader: SenseHatReader = SenseHatReader(TEMP_OFFSET)
 
     # --- Initialise SQLite buffer ---
     db_conn = _init_db(SQLITE_DB_PATH)
