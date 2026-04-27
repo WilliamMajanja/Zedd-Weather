@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, model_validator
 PROTOCOL_TAG = "RMPE2-WEATHER"
 MAX_DEPTH = 8
 MAX_PROOF_SIZE = 2048
+PROOF_BYTES_PER_DEPTH = 256
 PHASE_ORDER = ("data_entry", "consensus", "distribution", "settlement")
 
 

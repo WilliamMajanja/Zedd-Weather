@@ -138,7 +138,14 @@ def compose_sovereign_transition(request: ComposeTransitionRequest):
     try:
         transition = _sovereign_engine.compose_transition(request)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "compose_failed",
+                "error_type": exc.__class__.__name__,
+                "message": str(exc),
+            },
+        )
     validation = _sovereign_engine.validate_transition(transition)
     return {
         "transition": transition.model_dump(),

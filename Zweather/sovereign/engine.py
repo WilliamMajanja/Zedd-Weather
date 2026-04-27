@@ -7,6 +7,7 @@ from typing import Optional
 from .protocol import (
     MAX_DEPTH,
     PHASE_ORDER,
+    PROOF_BYTES_PER_DEPTH,
     ComposeTransitionRequest,
     RecursiveLayer,
     TransitionPhase,
@@ -161,7 +162,7 @@ class SovereignWeatherEngine:
             traces.append(
                 ValidationTrace(
                     layer=layer.value,
-                    valid=proof.proof_bytes <= next_state.depth_limit * 256,
+                    valid=proof.proof_bytes <= next_state.depth_limit * PROOF_BYTES_PER_DEPTH,
                     message=f"{layer.value} proof must fit inside the bounded proof budget",
                 )
             )
@@ -225,7 +226,7 @@ class SovereignWeatherEngine:
             return TransitionPhase.DATA_ENTRY
         if previous.phase == TransitionPhase.SETTLEMENT:
             raise ValueError("Cannot advance beyond settlement; issue a new root weather coin")
-        next_index = min(self._phase_index(previous.phase) + 1, len(PHASE_ORDER) - 1)
+        next_index = self._phase_index(previous.phase) + 1
         return TransitionPhase(PHASE_ORDER[next_index])
 
     @staticmethod

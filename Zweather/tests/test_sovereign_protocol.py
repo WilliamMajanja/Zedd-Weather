@@ -16,11 +16,15 @@ from Zweather.sovereign import (
 client = TestClient(app)
 
 
-def _observation(timestamp: int, station_id: str = "station-001") -> WeatherObservation:
+def _observation(
+    timestamp: int,
+    station_id: str = "station-001",
+    temperature_c: float = 36.5,
+) -> WeatherObservation:
     return WeatherObservation(
         station_id=station_id,
         timestamp=timestamp,
-        temperature_c=36.5,
+        temperature_c=temperature_c,
         humidity_pct=42.0,
         pressure_hpa=1008.0,
         wind_speed_ms=9.5,
@@ -81,6 +85,19 @@ class TestSovereignWeatherEngine:
 
         assert transition.next_state.phase == TransitionPhase.CONSENSUS
         assert transition.next_state.sequence == 1
+        assert result.valid is True
+
+    def test_compose_handles_extreme_cold_payload(self):
+        transition = self.engine.compose_transition(
+            ComposeTransitionRequest(
+                oracle_root="oracle-root-1",
+                observation=_observation(1_710_000_000, temperature_c=-12.5),
+            )
+        )
+
+        result = self.engine.validate_transition(transition)
+
+        assert transition.next_state.observation.temperature_c == -12.5
         assert result.valid is True
 
     def test_prevstate_rejects_non_monotonic_timestamp(self):
