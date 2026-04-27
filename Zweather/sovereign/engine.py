@@ -191,7 +191,11 @@ class SovereignWeatherEngine:
 
         policy_valid = True
         if RecursiveLayer.POLICY in active:
-            policy_valid = next_state.policy is not None and self._compare_policy(next_state.policy.comparator, next_state.policy.observed_value, next_state.policy.threshold)
+            policy_valid = next_state.policy is not None and self._compare_policy(
+                next_state.policy.comparator,
+                next_state.policy.observed_value,
+                next_state.policy.threshold,
+            )
         traces.append(
             ValidationTrace(
                 layer=RecursiveLayer.POLICY.value,
@@ -202,7 +206,11 @@ class SovereignWeatherEngine:
 
         settlement_valid = True
         if RecursiveLayer.SETTLEMENT in active:
-            settlement_valid = next_state.settlement is not None and next_state.policy is not None and next_state.policy.requires_settlement
+            settlement_valid = (
+                next_state.settlement is not None
+                and next_state.policy is not None
+                and next_state.policy.requires_settlement
+            )
         traces.append(
             ValidationTrace(
                 layer=RecursiveLayer.SETTLEMENT.value,
