@@ -86,10 +86,10 @@ class SovereignWeatherEngine:
 
         same_station = previous.station_id == next_state.station_id
         same_root = previous.oracle_root == next_state.oracle_root
-        timestamp_increases = next_state.weather_timestamp > previous.weather_timestamp
-        usage_increases = next_state.usage_counter > previous.usage_counter
-        sequence_linear = next_state.sequence == previous.sequence + 1
-        phase_linear = self._phase_index(next_state.phase) == self._phase_index(previous.phase) + 1
+        has_timestamp_increased = next_state.weather_timestamp > previous.weather_timestamp
+        has_usage_increased = next_state.usage_counter > previous.usage_counter
+        is_sequence_linear = next_state.sequence == previous.sequence + 1
+        is_phase_linear = self._phase_index(next_state.phase) == self._phase_index(previous.phase) + 1
 
         traces.extend(
             [
@@ -105,22 +105,22 @@ class SovereignWeatherEngine:
                 ),
                 ValidationTrace(
                     layer="prevstate",
-                    valid=timestamp_increases,
+                    valid=has_timestamp_increased,
                     message="Weather timestamp must strictly increase over PREVSTATE",
                 ),
                 ValidationTrace(
                     layer="prevstate",
-                    valid=usage_increases,
+                    valid=has_usage_increased,
                     message="Usage counter must strictly increase to prevent oracle overuse",
                 ),
                 ValidationTrace(
                     layer="prevstate",
-                    valid=sequence_linear,
+                    valid=is_sequence_linear,
                     message="Sequence must advance one step at a time",
                 ),
                 ValidationTrace(
                     layer="prevstate",
-                    valid=phase_linear,
+                    valid=is_phase_linear,
                     message="Phase progression must be linear and unskippable",
                 ),
             ]
