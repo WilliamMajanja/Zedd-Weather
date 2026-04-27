@@ -92,12 +92,36 @@ class SovereignWeatherEngine:
 
         traces.extend(
             [
-                ValidationTrace("prevstate", same_station, "Station identity must remain stable across PREVSTATE transitions"),
-                ValidationTrace("prevstate", same_root, "Oracle root must remain stable for a deterministic transition path"),
-                ValidationTrace("prevstate", timestamp_increases, "Weather timestamp must strictly increase over PREVSTATE"),
-                ValidationTrace("prevstate", usage_increases, "Usage counter must strictly increase to prevent oracle overuse"),
-                ValidationTrace("prevstate", sequence_linear, "Sequence must advance one step at a time"),
-                ValidationTrace("prevstate", phase_linear, "Phase progression must be linear and unskippable"),
+                ValidationTrace(
+                    layer="prevstate",
+                    valid=same_station,
+                    message="Station identity must remain stable across PREVSTATE transitions",
+                ),
+                ValidationTrace(
+                    layer="prevstate",
+                    valid=same_root,
+                    message="Oracle root must remain stable for a deterministic transition path",
+                ),
+                ValidationTrace(
+                    layer="prevstate",
+                    valid=timestamp_increases,
+                    message="Weather timestamp must strictly increase over PREVSTATE",
+                ),
+                ValidationTrace(
+                    layer="prevstate",
+                    valid=usage_increases,
+                    message="Usage counter must strictly increase to prevent oracle overuse",
+                ),
+                ValidationTrace(
+                    layer="prevstate",
+                    valid=sequence_linear,
+                    message="Sequence must advance one step at a time",
+                ),
+                ValidationTrace(
+                    layer="prevstate",
+                    valid=phase_linear,
+                    message="Phase progression must be linear and unskippable",
+                ),
             ]
         )
         return traces
