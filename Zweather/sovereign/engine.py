@@ -10,6 +10,7 @@ from .protocol import (
     PHASE_ORDER,
     PROOF_BYTES_PER_DEPTH,
     ComposeTransitionRequest,
+    PeerBlockHeader,
     RecursiveLayer,
     RecursiveMerkleProof,
     TransitionPhase,
@@ -314,7 +315,7 @@ class SovereignWeatherEngine:
         ]
 
     @staticmethod
-    def _missing_blocks_are_contiguous(blocks) -> bool:
+    def _missing_blocks_are_contiguous(blocks: list[PeerBlockHeader]) -> bool:
         for previous, current in zip(blocks, blocks[1:]):
             if current.height != previous.height + 1:
                 return False
