@@ -49,7 +49,7 @@ class EnviroPlusSensor(BaseSensor):
             # Discard first reading (sensor warm-up)
             self._bme280.get_temperature()
             any_ok = True
-            logger.info("Enviro+ BME280 initialised.")
+            logger.info("Enviro+ BME280 initialized.")
         except (ImportError, OSError) as exc:
             logger.warning("BME280 unavailable (%s).", exc)
 
@@ -58,7 +58,7 @@ class EnviroPlusSensor(BaseSensor):
             from ltr559 import LTR559
             self._ltr559 = LTR559()
             any_ok = True
-            logger.info("Enviro+ LTR559 light sensor initialised.")
+            logger.info("Enviro+ LTR559 light sensor initialized.")
         except (ImportError, OSError) as exc:
             logger.warning("LTR559 unavailable (%s).", exc)
 
@@ -67,7 +67,7 @@ class EnviroPlusSensor(BaseSensor):
             from enviroplus import gas as gas_module
             self._gas = gas_module
             any_ok = True
-            logger.info("Enviro+ gas sensor initialised.")
+            logger.info("Enviro+ gas sensor initialized.")
         except (ImportError, OSError) as exc:
             logger.warning("Gas sensor unavailable (%s).", exc)
 
@@ -76,7 +76,7 @@ class EnviroPlusSensor(BaseSensor):
             from pms5003 import PMS5003
             self._pms5003 = PMS5003()
             any_ok = True
-            logger.info("Enviro+ PMS5003 particulate sensor initialised.")
+            logger.info("Enviro+ PMS5003 particulate sensor initialized.")
         except (ImportError, OSError) as exc:
             logger.warning("PMS5003 unavailable (%s).", exc)
 
