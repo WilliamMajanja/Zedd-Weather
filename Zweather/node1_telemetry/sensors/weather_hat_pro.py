@@ -101,7 +101,7 @@ class WeatherHatProDriver(BaseSensor):
             # Discard first reading (sensor warm-up).
             self._bme280.get_temperature()
             any_ok = True
-            logger.info("Weather HAT PRO BME280 initialised.")
+            logger.info("Weather HAT PRO BME280 initialized.")
         except (ImportError, OSError) as exc:
             logger.warning("Weather HAT PRO BME280 unavailable (%s).", exc)
 
@@ -111,7 +111,7 @@ class WeatherHatProDriver(BaseSensor):
             self._adc = MCP3008(channel=config.WEATHER_HAT_PRO_VANE_ADC_CHANNEL)
             any_ok = True
             logger.info(
-                "Weather HAT PRO wind-vane ADC initialised on channel %d.",
+                "Weather HAT PRO wind-vane ADC initialized on channel %d.",
                 config.WEATHER_HAT_PRO_VANE_ADC_CHANNEL,
             )
         except (ImportError, OSError, RuntimeError) as exc:
@@ -143,7 +143,7 @@ class WeatherHatProDriver(BaseSensor):
             )
             any_ok = True
             logger.info(
-                "Weather HAT PRO GPIO pulse counters initialised "
+                "Weather HAT PRO GPIO pulse counters initialized "
                 "(anemometer=BCM%d, rain=BCM%d).",
                 config.WEATHER_HAT_PRO_ANEMOMETER_GPIO_PIN,
                 config.WEATHER_HAT_PRO_RAIN_GAUGE_GPIO_PIN,

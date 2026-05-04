@@ -80,7 +80,7 @@ class TestWeatherHatProDriver:
 class TestSensorManagerRegistration:
     """Ensure the Weather HAT PRO driver is wired into the SensorManager."""
 
-    def test_sensor_manager_initialises_weather_hat_pro(self):
+    def test_sensor_manager_initializes_weather_hat_pro(self):
         with patch.dict(os.environ, {
             "WEATHER_HAT_PRO_ENABLED": "true",
             "SENSE_HAT_ENABLED": "false",

@@ -51,7 +51,7 @@ class HailoNPUClient:
             if os.path.isfile(self._model_path):
                 self._hef = HEF(self._model_path)
                 if self._device is None:
-                    raise RuntimeError("HailoRTDevice failed to initialise")
+                    raise RuntimeError("HailoRTDevice failed to initialize")
                 params = self._device.create_configure_params(self._hef)
                 self._device.configure(self._hef, params)
                 logger.info(
