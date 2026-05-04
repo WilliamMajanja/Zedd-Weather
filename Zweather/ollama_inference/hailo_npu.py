@@ -50,8 +50,6 @@ class HailoNPUClient:
 
             if os.path.isfile(self._model_path):
                 self._hef = HEF(self._model_path)
-                if self._device is None:
-                    raise RuntimeError("HailoRTDevice failed to initialize")
                 params = self._device.create_configure_params(self._hef)
                 self._device.configure(self._hef, params)
                 logger.info(
@@ -182,7 +180,11 @@ class HailoNPUClient:
         if classification["source"] == "hailo_npu":
             # Structured edge response — no LLM needed
             label = classification["label"]
-            conf = classification["confidence"]
+            try:
+                raw_conf = float(classification.get("confidence", 0.0))
+            except (TypeError, ValueError):
+                raw_conf = 0.0
+            conf = max(0.0, min(1.0, raw_conf))
             temp = telemetry.get("temperature_c", "N/A")
             return (
                 f"[Edge NPU] Weather: {label} (confidence {conf:.1%}). "

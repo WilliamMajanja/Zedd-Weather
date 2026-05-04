@@ -2,6 +2,7 @@
 import importlib
 import os
 from unittest.mock import patch
+from Zweather.node1_telemetry.sensors.weather_hat_pro import WeatherHatProDriver
 
 
 def _reload():
@@ -38,7 +39,6 @@ class TestWeatherHatProDriver:
 
     def test_cardinal_conversion(self):
         """_degrees_to_cardinal should map common bearings correctly."""
-        WeatherHatProDriver = _reload().WeatherHatProDriver
         cases = {
             0: "N",
             45: "NE",
@@ -55,7 +55,6 @@ class TestWeatherHatProDriver:
 
     def test_voltage_to_bearing_matches_known_points(self):
         """The vane-voltage lookup should resolve canonical points exactly."""
-        WeatherHatProDriver = _reload().WeatherHatProDriver
         # 0.32 V is the calibrated entry for 112.5° in the lookup table.
         assert WeatherHatProDriver._voltage_to_bearing(0.32) == 112.5
         # 4.62 V is the calibrated entry for 270.0°.
