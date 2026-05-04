@@ -5,8 +5,12 @@ from fastapi.testclient import TestClient
 from Zweather.api import app
 from Zweather.sovereign import (
     ComposeTransitionRequest,
+    PeerBlockHeader,
     PROTOCOL_TAG,
     RecursiveLayer,
+    RecursiveMerkleProof,
+    RecursiveMerkleStep,
+    RNPEExchange,
     SovereignWeatherEngine,
     TransitionPhase,
     ValidationProof,
@@ -40,6 +44,19 @@ def _proof(layer: RecursiveLayer) -> ValidationProof:
         membership_verified=True,
         proof_bytes=128,
         condition=f"{layer.value} membership verified",
+    )
+
+
+def _rmp_proof() -> RecursiveMerkleProof:
+    leaf = "network-state:station-001:1710000000"
+    sibling = "peer-set:consensus-quorum"
+    root = SovereignWeatherEngine._hash_pair(leaf, sibling)
+    return RecursiveMerkleProof(
+        leaf_hash=leaf,
+        merkle_root=root,
+        path=[RecursiveMerkleStep(sibling_hash=sibling, side="right")],
+        proof_bytes=128,
+        state_reference="station-001@1710000000",
     )
 
 
@@ -137,6 +154,101 @@ class TestSovereignWeatherEngine:
         assert result.valid is False
         assert any(trace.layer == "settlement" and trace.valid is False for trace in result.traces)
 
+    def test_rmp_validates_compressed_network_state(self):
+        transition = self.engine.compose_transition(
+            ComposeTransitionRequest(
+                oracle_root="oracle-root-1",
+                observation=_observation(1_710_000_000),
+                rmp_proof=_rmp_proof(),
+            )
+        )
+
+        result = self.engine.validate_transition(transition)
+
+        assert result.valid is True
+        assert result.network_verified is True
+        assert any(trace.layer == "rmp" and trace.valid is True for trace in result.traces)
+
+    def test_rnpe_exchange_reconciles_missing_blocks_to_consensus(self):
+        rmp_proof = _rmp_proof()
+        exchange = RNPEExchange(
+            peer_id="peer-a",
+            local_tip_height=10,
+            local_tip_hash="block-10",
+            consensus_tip_height=12,
+            consensus_tip_hash="block-12",
+            missing_blocks=[
+                PeerBlockHeader(
+                    height=11,
+                    block_hash="block-11",
+                    previous_hash="block-10",
+                    state_root="intermediate-root",
+                ),
+                PeerBlockHeader(
+                    height=12,
+                    block_hash="block-12",
+                    previous_hash="block-11",
+                    state_root=rmp_proof.merkle_root,
+                ),
+            ],
+            recursive_proof=rmp_proof,
+        )
+        transition = self.engine.compose_transition(
+            ComposeTransitionRequest(
+                oracle_root="oracle-root-1",
+                observation=_observation(1_710_000_000),
+                rnpe_exchange=exchange,
+            )
+        )
+
+        result = self.engine.validate_transition(transition)
+
+        assert result.valid is True
+        assert result.network_verified is True
+
+    def test_rnpe_exchange_rejects_unlinked_missing_blocks(self):
+        rmp_proof = _rmp_proof()
+        exchange = RNPEExchange(
+            peer_id="peer-a",
+            local_tip_height=10,
+            local_tip_hash="block-10",
+            consensus_tip_height=12,
+            consensus_tip_hash="block-12",
+            missing_blocks=[
+                PeerBlockHeader(
+                    height=11,
+                    block_hash="block-11",
+                    previous_hash="block-10",
+                    state_root="intermediate-root",
+                ),
+                PeerBlockHeader(
+                    height=12,
+                    block_hash="block-12",
+                    previous_hash="wrong-parent",
+                    state_root=rmp_proof.merkle_root,
+                ),
+            ],
+            recursive_proof=rmp_proof,
+        )
+        transition = self.engine.compose_transition(
+            ComposeTransitionRequest(
+                oracle_root="oracle-root-1",
+                observation=_observation(1_710_000_000),
+                rnpe_exchange=exchange,
+            )
+        )
+
+        result = self.engine.validate_transition(transition)
+
+        assert result.valid is False
+        assert result.network_verified is False
+        assert any(
+            trace.layer == "rnpe"
+            and trace.valid is False
+            and "height-contiguous and hash-linked" in trace.message
+            for trace in result.traces
+        )
+
 
 class TestSovereignProtocolAPI:
     def test_protocol_descriptor_endpoint(self):
@@ -145,6 +257,7 @@ class TestSovereignProtocolAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["protocol_tag"] == PROTOCOL_TAG
+        assert data["network_peer_exchange"] == "RNPE-2"
         assert data["compatibility_tooling"] is True
         assert "/api/telemetry/ingest" in data["compatibility_endpoints"]
 

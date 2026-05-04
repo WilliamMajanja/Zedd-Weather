@@ -11,6 +11,7 @@ PROTOCOL_TAG = "RMPE2-WEATHER"
 MAX_DEPTH = 8
 MAX_PROOF_SIZE = 2048
 PROOF_BYTES_PER_DEPTH = 256
+RNPE_VERSION = "RNPE-2"
 PHASE_ORDER = ("data_entry", "consensus", "distribution", "settlement")
 
 
@@ -36,6 +37,48 @@ class ValidationProof(BaseModel):
     membership_verified: bool = Field(..., description="True when the caller has verified the proof before branch evaluation")
     proof_bytes: int = Field(..., ge=1, le=MAX_PROOF_SIZE, description="Serialized proof size in bytes")
     condition: str = Field(..., min_length=1, description="Human-readable branch condition guarded by this proof")
+
+
+class RecursiveMerkleStep(BaseModel):
+    """One compressed sibling step in an RMP membership path."""
+
+    sibling_hash: str = Field(..., min_length=1)
+    side: Literal["left", "right"] = Field(
+        ...,
+        description="Side of the sibling hash relative to the rolling proof hash",
+    )
+
+
+class RecursiveMerkleProof(BaseModel):
+    """Compressed RMP proof for validating the current network state."""
+
+    leaf_hash: str = Field(..., min_length=1)
+    merkle_root: str = Field(..., min_length=1)
+    path: list[RecursiveMerkleStep] = Field(default_factory=list, max_length=MAX_DEPTH)
+    proof_bytes: int = Field(..., ge=1, le=MAX_PROOF_SIZE)
+    state_reference: str = Field(..., min_length=1)
+
+
+class PeerBlockHeader(BaseModel):
+    """Minimal block header exchanged through RNPE-2 for gap recovery."""
+
+    height: int = Field(..., ge=0)
+    block_hash: str = Field(..., min_length=1)
+    previous_hash: str = Field(..., min_length=1)
+    state_root: str = Field(..., min_length=1)
+
+
+class RNPEExchange(BaseModel):
+    """Recursive Network Peer Exchange payload for consensus catch-up."""
+
+    version: Literal[RNPE_VERSION] = RNPE_VERSION
+    peer_id: str = Field(..., min_length=1)
+    local_tip_height: int = Field(..., ge=0)
+    local_tip_hash: str = Field(..., min_length=1)
+    consensus_tip_height: int = Field(..., ge=0)
+    consensus_tip_hash: str = Field(..., min_length=1)
+    missing_blocks: list[PeerBlockHeader] = Field(default_factory=list)
+    recursive_proof: RecursiveMerkleProof
 
 
 class WeatherObservation(BaseModel):
@@ -121,6 +164,8 @@ class ComposeTransitionRequest(BaseModel):
     settlement: Optional[SettlementClaim] = None
     usage_increment: int = Field(1, ge=1)
     active_layers: list[RecursiveLayer] = Field(default_factory=list)
+    rmp_proof: Optional[RecursiveMerkleProof] = None
+    rnpe_exchange: Optional[RNPEExchange] = None
 
 
 class WeatherTransition(BaseModel):
@@ -130,6 +175,8 @@ class WeatherTransition(BaseModel):
     next_state: WeatherCoinState
     proofs: list[ValidationProof] = Field(default_factory=list)
     active_layers: list[RecursiveLayer] = Field(default_factory=list)
+    rmp_proof: Optional[RecursiveMerkleProof] = None
+    rnpe_exchange: Optional[RNPEExchange] = None
 
 
 class ValidationTrace(BaseModel):
@@ -146,6 +193,7 @@ class ValidationResult(BaseModel):
     traces: list[ValidationTrace]
     recursive_calls: int = Field(..., ge=0)
     remaining_depth: int = Field(..., ge=0, le=MAX_DEPTH)
+    network_verified: bool = Field(False, description="True when RMP/RNPE-2 consensus checks passed")
     compatibility_mode: bool = Field(
         True,
         description="True when the result is emitted by HTTP tooling instead of a chain-native Minima validator",

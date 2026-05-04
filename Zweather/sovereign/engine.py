@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import Optional
 
 from .protocol import (
@@ -10,6 +11,7 @@ from .protocol import (
     PROOF_BYTES_PER_DEPTH,
     ComposeTransitionRequest,
     RecursiveLayer,
+    RecursiveMerkleProof,
     TransitionPhase,
     ValidationResult,
     ValidationTrace,
@@ -42,6 +44,8 @@ class SovereignWeatherEngine:
             next_state=next_state,
             proofs=request.proofs,
             active_layers=request.active_layers,
+            rmp_proof=request.rmp_proof,
+            rnpe_exchange=request.rnpe_exchange,
         )
 
     def validate_transition(self, transition: WeatherTransition) -> ValidationResult:
@@ -51,6 +55,8 @@ class SovereignWeatherEngine:
 
         traces.extend(self._validate_core_state(previous, next_state))
         traces.extend(self._validate_recursive_layers(transition))
+        network_traces = self._validate_network_state(transition)
+        traces.extend(network_traces)
 
         recursive_calls = len(transition.active_layers)
         remaining_depth = max(next_state.depth_limit - recursive_calls, 0)
@@ -59,6 +65,7 @@ class SovereignWeatherEngine:
             traces=traces,
             recursive_calls=recursive_calls,
             remaining_depth=remaining_depth,
+            network_verified=bool(network_traces) and all(trace.valid for trace in network_traces),
         )
 
     def _validate_core_state(
@@ -221,6 +228,100 @@ class SovereignWeatherEngine:
         )
         return traces
 
+    def _validate_network_state(self, transition: WeatherTransition) -> list[ValidationTrace]:
+        traces: list[ValidationTrace] = []
+
+        if transition.rmp_proof is not None:
+            traces.extend(self._validate_rmp(transition.rmp_proof))
+
+        if transition.rnpe_exchange is None:
+            return traces
+
+        exchange = transition.rnpe_exchange
+        rmp_proof = exchange.recursive_proof
+        traces.extend(self._validate_rmp(rmp_proof))
+
+        if exchange.missing_blocks:
+            first_block = exchange.missing_blocks[0]
+            last_block = exchange.missing_blocks[-1]
+            links_from_local_tip = (
+                first_block.height == exchange.local_tip_height + 1
+                and first_block.previous_hash == exchange.local_tip_hash
+            )
+            reaches_consensus_tip = (
+                last_block.height == exchange.consensus_tip_height
+                and last_block.block_hash == exchange.consensus_tip_hash
+            )
+            final_state_matches_rmp = last_block.state_root == rmp_proof.merkle_root
+        else:
+            links_from_local_tip = True
+            reaches_consensus_tip = (
+                exchange.local_tip_height == exchange.consensus_tip_height
+                and exchange.local_tip_hash == exchange.consensus_tip_hash
+            )
+            final_state_matches_rmp = rmp_proof.merkle_root == transition.next_state.oracle_root
+
+        traces.extend(
+            [
+                ValidationTrace(
+                    layer="rnpe",
+                    valid=links_from_local_tip,
+                    message="RNPE-2 missing block range must start from the local tip",
+                ),
+                ValidationTrace(
+                    layer="rnpe",
+                    valid=self._missing_blocks_are_contiguous(exchange.missing_blocks),
+                    message="RNPE-2 missing blocks must be height-contiguous and hash-linked",
+                ),
+                ValidationTrace(
+                    layer="rnpe",
+                    valid=reaches_consensus_tip,
+                    message="RNPE-2 exchange must reconcile to the advertised consensus tip",
+                ),
+                ValidationTrace(
+                    layer="rnpe",
+                    valid=final_state_matches_rmp,
+                    message="RNPE-2 consensus state root must match the recursive Merkle proof",
+                ),
+            ]
+        )
+        return traces
+
+    def _validate_rmp(self, proof: RecursiveMerkleProof) -> list[ValidationTrace]:
+        computed_root = proof.leaf_hash
+        for step in proof.path:
+            if step.side == "left":
+                computed_root = self._hash_pair(step.sibling_hash, computed_root)
+            else:
+                computed_root = self._hash_pair(computed_root, step.sibling_hash)
+
+        return [
+            ValidationTrace(
+                layer="rmp",
+                valid=len(proof.path) <= MAX_DEPTH,
+                message="RMP path depth must fit inside the recursive proof limit",
+            ),
+            ValidationTrace(
+                layer="rmp",
+                valid=proof.proof_bytes <= max(len(proof.path), 1) * PROOF_BYTES_PER_DEPTH,
+                message="RMP compressed proof must fit inside the bounded proof budget",
+            ),
+            ValidationTrace(
+                layer="rmp",
+                valid=computed_root == proof.merkle_root,
+                message="RMP leaf and compressed path must recompute the advertised Merkle root",
+            ),
+        ]
+
+    @staticmethod
+    def _missing_blocks_are_contiguous(blocks) -> bool:
+        for previous, current in zip(blocks, blocks[1:]):
+            if current.height != previous.height + 1:
+                return False
+            if current.previous_hash != previous.block_hash:
+                return False
+        return True
+
     def _next_phase(self, previous: Optional[WeatherCoinState]) -> TransitionPhase:
         if previous is None:
             return TransitionPhase.DATA_ENTRY
@@ -247,3 +348,7 @@ class SovereignWeatherEngine:
         if comparator == "lte":
             return observed_value <= threshold
         return observed_value == threshold
+
+    @staticmethod
+    def _hash_pair(left_hash: str, right_hash: str) -> str:
+        return hashlib.sha256(f"{left_hash}:{right_hash}".encode("utf-8")).hexdigest()
