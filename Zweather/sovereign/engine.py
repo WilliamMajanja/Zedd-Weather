@@ -296,7 +296,7 @@ class SovereignWeatherEngine:
             else:
                 computed_root = self._hash_pair(computed_root, step.sibling_hash)
         serialized_minimum = len(proof.leaf_hash.encode("utf-8")) + sum(
-            len(step.sibling_hash.encode("utf-8")) + len(step.side)
+            len(step.sibling_hash.encode("utf-8")) + len(step.side.encode("utf-8"))
             for step in proof.path
         )
 
