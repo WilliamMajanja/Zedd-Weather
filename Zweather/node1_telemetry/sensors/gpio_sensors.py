@@ -100,4 +100,4 @@ class RainGaugeSensor(BaseSensor):
                 import RPi.GPIO as GPIO
                 GPIO.remove_event_detect(config.RAIN_GAUGE_GPIO_PIN)
             except (ImportError, RuntimeError):
-                pass
+                logger.debug("Rain gauge GPIO cleanup failed", exc_info=True)

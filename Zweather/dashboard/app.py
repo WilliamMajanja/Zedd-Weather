@@ -42,11 +42,10 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-import dash
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 import requests
-from dash import Input, Output, State, callback, ctx, dcc, html, no_update
+from dash import Dash, Input, Output, State, callback, ctx, dcc, html, no_update
 
 logger = logging.getLogger(__name__)
 
@@ -443,7 +442,7 @@ def _header() -> html.Header:
 # App bootstrap
 # ---------------------------------------------------------------------------
 
-app = dash.Dash(
+app = Dash(
     __name__,
     external_stylesheets=[dbc.themes.SLATE],
     suppress_callback_exceptions=True,

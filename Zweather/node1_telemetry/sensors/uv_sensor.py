@@ -111,4 +111,4 @@ class UVSensor(BaseSensor):
                 )
                 self._bus.close()
             except OSError:
-                pass
+                logger.debug("UV sensor cleanup failed", exc_info=True)

@@ -135,4 +135,4 @@ class AlarmController:
                     config.ALARM_LED_GPIO_PIN,
                 ])
             except (RuntimeError, AttributeError):
-                pass
+                logger.debug("GPIO alarm cleanup failed", exc_info=True)

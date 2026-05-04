@@ -278,8 +278,12 @@ class WeatherHatProDriver(BaseSensor):
                 try:
                     GPIO.remove_event_detect(pin)
                 except (RuntimeError, ValueError):
-                    pass
+                    logger.debug(
+                        "Weather HAT PRO event cleanup failed for GPIO %d",
+                        pin,
+                        exc_info=True,
+                    )
         except (ImportError, RuntimeError):
-            pass
+            logger.debug("Weather HAT PRO GPIO cleanup unavailable", exc_info=True)
         self._bme280 = None
         self._adc = None
