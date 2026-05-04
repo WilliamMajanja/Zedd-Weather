@@ -492,7 +492,7 @@ def run() -> None:
         try:
             influx_client.close()
         except Exception:
-            pass
+            log.debug("Failed to close InfluxDB client during shutdown", exc_info=True)
     db_conn.close()
     log.info("Edge collector stopped")
 

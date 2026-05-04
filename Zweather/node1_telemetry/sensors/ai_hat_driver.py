@@ -124,4 +124,4 @@ class AIHatDriver(BaseSensor):
             try:
                 self._device.release()
             except Exception:
-                pass
+                logger.debug("AI HAT cleanup failed", exc_info=True)

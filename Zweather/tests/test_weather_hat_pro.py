@@ -38,9 +38,7 @@ class TestWeatherHatProDriver:
 
     def test_cardinal_conversion(self):
         """_degrees_to_cardinal should map common bearings correctly."""
-        from Zweather.node1_telemetry.sensors.weather_hat_pro import (
-            WeatherHatProDriver,
-        )
+        WeatherHatProDriver = _reload().WeatherHatProDriver
         cases = {
             0: "N",
             45: "NE",
@@ -57,9 +55,7 @@ class TestWeatherHatProDriver:
 
     def test_voltage_to_bearing_matches_known_points(self):
         """The vane-voltage lookup should resolve canonical points exactly."""
-        from Zweather.node1_telemetry.sensors.weather_hat_pro import (
-            WeatherHatProDriver,
-        )
+        WeatherHatProDriver = _reload().WeatherHatProDriver
         # 0.32 V is the calibrated entry for 112.5° in the lookup table.
         assert WeatherHatProDriver._voltage_to_bearing(0.32) == 112.5
         # 4.62 V is the calibrated entry for 270.0°.
@@ -68,9 +64,7 @@ class TestWeatherHatProDriver:
     def test_voltage_to_bearing_rejects_out_of_range(self):
         """Voltages far from any vane resistor are reported as None
         (vane likely disconnected or wired incorrectly)."""
-        from Zweather.node1_telemetry.sensors.weather_hat_pro import (
-            WeatherHatProDriver,
-        )
+        WeatherHatProDriver = _reload().WeatherHatProDriver
         # 8.0 V is way above the highest expected vane voltage.
         assert WeatherHatProDriver._voltage_to_bearing(8.0) is None
 

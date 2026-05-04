@@ -13,9 +13,8 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 import Zweather.api as api_module
-from Zweather.api import app
 
-client = TestClient(app)
+client = TestClient(api_module.app)
 
 
 @pytest.fixture(autouse=True)

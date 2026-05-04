@@ -141,4 +141,4 @@ class EnviroPlusSensor(BaseSensor):
             try:
                 self._pms5003.reset()
             except Exception:
-                pass
+                logger.debug("Enviro+ PMS5003 cleanup failed", exc_info=True)

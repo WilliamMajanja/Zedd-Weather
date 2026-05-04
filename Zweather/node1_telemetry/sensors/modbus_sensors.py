@@ -111,4 +111,4 @@ class ModbusSensors(BaseSensor):
             try:
                 self._client.close()
             except Exception:
-                pass
+                logger.debug("Modbus client cleanup failed", exc_info=True)
