@@ -308,13 +308,13 @@ class SovereignWeatherEngine:
             ),
             ValidationTrace(
                 layer="rmp",
-                valid=proof.proof_bytes <= max(len(proof.path), 1) * PROOF_BYTES_PER_DEPTH,
-                message="RMP compressed proof must fit inside the bounded proof budget",
+                valid=proof.proof_bytes >= serialized_minimum,
+                message="RMP proof bytes must cover the serialized leaf and path",
             ),
             ValidationTrace(
                 layer="rmp",
-                valid=proof.proof_bytes >= serialized_minimum,
-                message="RMP proof bytes must cover the serialized leaf and path",
+                valid=proof.proof_bytes <= max(len(proof.path), 1) * PROOF_BYTES_PER_DEPTH,
+                message="RMP compressed proof must fit inside the bounded proof budget",
             ),
             ValidationTrace(
                 layer="rmp",
