@@ -295,6 +295,10 @@ class SovereignWeatherEngine:
                 computed_root = self._hash_pair(step.sibling_hash, computed_root)
             else:
                 computed_root = self._hash_pair(computed_root, step.sibling_hash)
+        serialized_minimum = len(proof.leaf_hash.encode("utf-8")) + sum(
+            len(step.sibling_hash.encode("utf-8")) + len(step.side)
+            for step in proof.path
+        )
 
         return [
             ValidationTrace(
@@ -306,6 +310,11 @@ class SovereignWeatherEngine:
                 layer="rmp",
                 valid=proof.proof_bytes <= max(len(proof.path), 1) * PROOF_BYTES_PER_DEPTH,
                 message="RMP compressed proof must fit inside the bounded proof budget",
+            ),
+            ValidationTrace(
+                layer="rmp",
+                valid=proof.proof_bytes >= serialized_minimum,
+                message="RMP proof bytes must cover the serialized leaf and path",
             ),
             ValidationTrace(
                 layer="rmp",

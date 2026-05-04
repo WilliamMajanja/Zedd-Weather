@@ -169,6 +169,28 @@ class TestSovereignWeatherEngine:
         assert result.network_verified is True
         assert any(trace.layer == "rmp" and trace.valid is True for trace in result.traces)
 
+    def test_rmp_rejects_undersized_serialized_proof(self):
+        proof = _rmp_proof()
+        proof.proof_bytes = 1
+        transition = self.engine.compose_transition(
+            ComposeTransitionRequest(
+                oracle_root="oracle-root-1",
+                observation=_observation(1_710_000_000),
+                rmp_proof=proof,
+            )
+        )
+
+        result = self.engine.validate_transition(transition)
+
+        assert result.valid is False
+        assert result.network_verified is False
+        assert any(
+            trace.layer == "rmp"
+            and trace.valid is False
+            and "serialized leaf and path" in trace.message
+            for trace in result.traces
+        )
+
     def test_rnpe_exchange_reconciles_missing_blocks_to_consensus(self):
         rmp_proof = _rmp_proof()
         exchange = RNPEExchange(
