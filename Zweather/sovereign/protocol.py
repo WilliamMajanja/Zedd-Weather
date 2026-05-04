@@ -71,7 +71,7 @@ class PeerBlockHeader(BaseModel):
 class RNPEExchange(BaseModel):
     """Recursive Network Peer Exchange payload for consensus catch-up."""
 
-    version: Literal[RNPE_VERSION] = Field(default=RNPE_VERSION)
+    version: str = Field(default=RNPE_VERSION, min_length=1)
     peer_id: str = Field(..., min_length=1)
     local_tip_height: int = Field(..., ge=0)
     local_tip_hash: str = Field(..., min_length=1)

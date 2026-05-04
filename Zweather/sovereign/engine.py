@@ -296,11 +296,11 @@ class SovereignWeatherEngine:
             else:
                 computed_root = self._hash_pair(computed_root, step.sibling_hash)
         path_byte_lengths = (
-            len(step.sibling_hash.encode("utf-8")) + len(step.side.encode("utf-8"))
+            len(step.sibling_hash.encode("utf-8")) + len(step.side.encode("utf-8")) + 2
             for step in proof.path
         )
         effective_depth = max(len(proof.path), 1)
-        serialized_minimum = len(proof.leaf_hash.encode("utf-8")) + sum(path_byte_lengths)
+        serialized_minimum = len(proof.leaf_hash.encode("utf-8")) + 1 + sum(path_byte_lengths)
 
         return [
             ValidationTrace(
