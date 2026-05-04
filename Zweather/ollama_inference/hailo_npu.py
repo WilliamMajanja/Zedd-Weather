@@ -109,15 +109,33 @@ class HailoNPUClient:
             ).reshape(1, -1)
 
             # Run synchronous inference on the NPU
-            input_vstreams = self._device.create_input_vstreams(self._hef)
-            output_vstreams = self._device.create_output_vstreams(self._hef)
+            input_vstreams = None
+            output_vstreams = None
+            try:
+                input_vstreams = self._device.create_input_vstreams(self._hef)
+                output_vstreams = self._device.create_output_vstreams(self._hef)
 
-            input_vstreams[0].send(features)
-            result = output_vstreams[0].recv()
+                input_vstreams[0].send(features)
+                result = output_vstreams[0].recv()
+            finally:
+                if output_vstreams is not None:
+                    for stream in output_vstreams:
+                        close_fn = getattr(stream, "close", None)
+                        if callable(close_fn):
+                            close_fn()
+                if input_vstreams is not None:
+                    for stream in input_vstreams:
+                        close_fn = getattr(stream, "close", None)
+                        if callable(close_fn):
+                            close_fn()
 
             label_idx = int(np.argmax(result))
             labels = ["clear", "cloudy", "rain", "storm", "fog", "snow"]
-            label = labels[label_idx] if label_idx < len(labels) else "unknown"
+            label = (
+                labels[label_idx]
+                if 0 <= label_idx < len(labels)
+                else "unknown"
+            )
             confidence = round(float(np.max(result)), 3)
 
             return {
