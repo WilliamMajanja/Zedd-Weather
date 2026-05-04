@@ -4,7 +4,7 @@ Pimoroni Enviro+ sensor suite driver.
 Exposes readings from:
     - BME280  — temperature, pressure, humidity (higher accuracy than Sense HAT)
     - LTR559  — ambient light and proximity
-    - MICS6814 (analog via ADS1015) — reducing, oxidising, and NH₃ gas levels
+    - MICS6814 (analog via ADS1015) — reducing, oxidising, and NH3 gas levels
     - PMS5003  — particulate matter (PM1.0, PM2.5, PM10)
 
 All sub-sensors degrade gracefully: if one component fails to initialise the

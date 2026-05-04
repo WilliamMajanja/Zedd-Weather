@@ -5,12 +5,12 @@ The Weather HAT PRO (BCRobotics) is a Raspberry Pi add-on board that
 exposes the following weather peripherals via three RJ12 jacks and an
 on-board environmental sensor:
 
-    - BME280               – temperature, pressure, humidity (I2C)
-    - Reed-switch anemometer (RJ12 J2) – wind speed via pulse counter
+    - BME280               - temperature, pressure, humidity (I2C)
+    - Reed-switch anemometer (RJ12 J2) - wind speed via pulse counter
                                           (one closure per revolution)
-    - Wind vane (RJ12 J2) – analog wind direction read via the on-board
+    - Wind vane (RJ12 J2) - analog wind direction read via the on-board
                             ADS1015 / MCP3008 ADC
-    - Tipping-bucket rain gauge (RJ12 J3) – pulse counter on a reed
+    - Tipping-bucket rain gauge (RJ12 J3) - pulse counter on a reed
                                             switch (one closure per tip,
                                             ``RAIN_GAUGE_MM_PER_TIP`` mm)
 
@@ -29,6 +29,7 @@ import math
 import time
 import threading
 import logging
+from typing import Optional
 
 from Zweather.node1_telemetry.sensors.base import BaseSensor
 from Zweather.node1_telemetry import config
@@ -239,7 +240,7 @@ class WeatherHatProDriver(BaseSensor):
     # Helpers
     # ------------------------------------------------------------------
     @staticmethod
-    def _voltage_to_bearing(voltage: float) -> float | None:
+    def _voltage_to_bearing(voltage: float) -> Optional[float]:
         """Match a vane voltage to the closest entry in the lookup table."""
         best_bearing = None
         best_delta = math.inf

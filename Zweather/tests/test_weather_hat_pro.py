@@ -25,7 +25,7 @@ class TestWeatherHatProDriver:
             assert driver.read() == {}
 
     def test_unavailable_returns_empty(self):
-        """When the underlying I²C / GPIO libraries are absent the enabled
+        """When the underlying I2C / GPIO libraries are absent the enabled
         driver still returns an empty payload — no synthetic data ever."""
         with patch.dict(os.environ, {"WEATHER_HAT_PRO_ENABLED": "true"}):
             whp = _reload()
