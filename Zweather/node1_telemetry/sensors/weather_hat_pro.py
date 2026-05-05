@@ -50,6 +50,10 @@ _ANEMOMETER_MS_PER_HZ = 0.6667
 _ANEMOMETER_DEBOUNCE_MS = 10
 _RAIN_GAUGE_DEBOUNCE_MS = 300
 
+# Lower bound for read-interval duration (seconds) to avoid divide-by-zero
+# and unstable wind-speed calculations when reads occur very close together.
+_MIN_ELAPSED_SECONDS = 0.001
+
 # Maximum allowed delta (Volts) between a measured wind-vane voltage
 # and a known calibration point in ``_VANE_LOOKUP``.  Readings further
 # away than this are treated as a wiring fault and the bearing is
@@ -203,7 +207,7 @@ class WeatherHatProDriver(BaseSensor):
             self._anemometer_pulses = 0
             rain_pulses = self._rain_pulses
             self._rain_pulses = 0
-            elapsed = max(now - self._last_read_time, 0.001)
+            elapsed = max(now - self._last_read_time, _MIN_ELAPSED_SECONDS)
             self._last_read_time = now
 
         wind_hz = anemo_pulses / elapsed
