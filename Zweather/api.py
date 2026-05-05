@@ -29,6 +29,7 @@ from Zweather.sovereign import (
     MAX_PROOF_SIZE,
     PHASE_ORDER,
     PROTOCOL_TAG,
+    RNPE_VERSION,
     ComposeTransitionRequest,
     SovereignWeatherEngine,
     WeatherTransition,
@@ -88,6 +89,7 @@ class HealthResponse(BaseModel):
 
 class SovereignProtocolInfo(BaseModel):
     protocol_tag: str
+    network_peer_exchange: str
     max_depth: int
     max_proof_size: int
     accepted_phases: list[str]
@@ -116,6 +118,7 @@ def get_sovereign_protocol():
     """
     return SovereignProtocolInfo(
         protocol_tag=PROTOCOL_TAG,
+        network_peer_exchange=RNPE_VERSION,
         max_depth=MAX_DEPTH,
         max_proof_size=MAX_PROOF_SIZE,
         accepted_phases=list(PHASE_ORDER),

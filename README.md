@@ -332,9 +332,9 @@ Interactive OpenAPI docs are available at <http://localhost:8000/docs> when the 
 | `POST` | `/api/ai/risk` | AI risk narrative |
 | `POST` | `/api/ai/forecast` | AI forecast narrative |
 | `POST` | `/api/ai/sitemap` | Site logistics guidance |
-| `GET` | `/api/sovereign/protocol` | RMPE-2 protocol description |
+| `GET` | `/api/sovereign/protocol` | Sovereign protocol description, including RMP/RNPE-2 metadata |
 | `POST` | `/api/sovereign/compose` | Compose a deterministic weather-state transition |
-| `POST` | `/api/sovereign/validate` | Validate a weather-state transition |
+| `POST` | `/api/sovereign/validate` | Validate a weather-state transition, optional RMP proof, and optional RNPE-2 exchange |
 
 ## Deployment patterns
 
